@@ -2,23 +2,38 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Course en Cours — Tableau de bord</title>
+<title>Course en Cours — Espace projet</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header><div><span class="eyebrow">COURSE EN COURS</span><h1>🏎️ Tableau de bord</h1><p>Carnet de bord numérique du projet</p></div><div id="identity" class="identity"></div></header>
-<main>
-<section id="welcome" class="card welcome"><h2>👋 Première visite</h2><p>Choisis la partie du projet sur laquelle tu travailles. Tu pourras toujours la changer ensuite.</p><div id="teams" class="teams"></div></section>
-<section id="dashboard" hidden>
-<div class="hero card"><div><span class="eyebrow">TON ÉQUIPE</span><h2 id="teamName"></h2><p id="teamDesc"></p></div><button id="changeTeam" class="secondary">Changer d'équipe</button></div>
-<div class="grid" id="cards"></div>
-<div class="card"><h2>📊 Progression de toutes les équipes</h2><div id="progress"></div></div>
-<div class="grid two">
-<div class="card"><h2>⚡ Actions rapides</h2><div class="actions"><a href="../JOURNEES/README.md">📅 Nouvelle séance</a><a href="../ANNOTATIONS/README.md">💬 Annotation</a><a href="../PROBLEMES/README.md">⚠️ Problème</a><a href="../IDEES/README.md">💡 Idée</a><a href="../TESTS/README.md">🧪 Test</a></div></div>
-<div class="card"><h2>👑 Administration</h2><p id="adminText"></p><a id="adminLink" class="admin" href="../EQUIPE.md">⚙️ Gestion du projet</a></div>
+<header class="topbar">
+  <div class="brand"><div class="logo">🏎️</div><div><span>COURSE EN COURS</span><h1>Espace projet</h1></div></div>
+  <div class="top-actions"><span id="identity" class="identity"></span><button id="roleBtn" class="ghost">Changer de vue</button></div>
+</header>
+<div class="layout">
+  <aside class="sidebar">
+    <nav>
+      <button class="nav active" data-page="accueil">🏠 <span>Accueil</span></button>
+      <button class="nav" data-page="progression">📊 <span>Progression</span></button>
+      <button class="nav" data-page="equipes">👥 <span>Équipes</span></button>
+      <button class="nav" data-page="journal">📅 <span>Journal</span></button>
+      <button class="nav" data-page="annotations">💬 <span>Annotations</span></button>
+      <button class="nav" data-page="problemes">⚠️ <span>Problèmes</span></button>
+      <button class="nav" data-page="idees">💡 <span>Idées</span></button>
+      <button class="nav" data-page="tests">🧪 <span>Tests</span></button>
+    </nav>
+    <div class="side-bottom"><div class="mini">📁 <div><b>Documents</b><small>Voir le dépôt GitHub</small></div></div><a class="github" href="https://github.com/Arthe1200/course-en-cours" target="_blank">Ouvrir GitHub ↗</a></div>
+  </aside>
+  <main>
+    <div id="welcome" class="welcome card">
+      <div><span class="eyebrow">PREMIÈRE VISITE</span><h2>Bienvenue dans le projet 👋</h2><p>Choisis ton équipe. Tu pourras consulter le travail de tout le groupe et utiliser les outils de suivi.</p></div>
+      <div id="teams" class="team-grid"></div>
+    </div>
+    <section id="app" hidden>
+      <div id="page"></div>
+    </section>
+  </main>
 </div>
-</section>
-</main>
-<footer>Interface V2.1 · Les permissions réelles restent celles de GitHub.</footer>
+<div id="roleModal" class="modal" hidden><div class="modal-box"><button id="closeRole" class="close">×</button><span class="eyebrow">MODE D'AFFICHAGE</span><h2>Qui es-tu ?</h2><p>Cette sélection personnalise l'interface. Les vraies permissions restent celles de GitHub.</p><div class="role-grid"><button data-role="eleve">👨‍🎓<b>Élève</b><small>Travail, annotations, idées, problèmes</small></button><button data-role="prof">👨‍🏫<b>Professeur</b><small>Suivi, validation et vue globale</small></button><button data-role="admin">👑<b>Administrateur</b><small>Gestion complète du projet</small></button></div></div></div>
 <script src="app.js"></script>
 </body></html>
