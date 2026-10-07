@@ -61,6 +61,20 @@ Lors d'une séance, indiquez simplement le niveau atteint :
 - ⚙️ [Technique](TECHNIQUE/README.md) — matériaux, dimensions, contraintes et essais
 - 📚 [Documentation](DOCUMENTATION/README.md) — recherches et comptes rendus
 
+## 🏎️ Nouveaux outils du projet
+
+- 👥 [Équipes](EQUIPE.md) — répartition des responsabilités
+- 💬 [Annotations](ANNOTATIONS/README.md) — remarques sans modifier le travail d'une autre équipe
+- ⚠️ [Problèmes](PROBLEMES/README.md) — suivi des difficultés
+- 💡 [Idées](IDEES/README.md) — propositions et améliorations
+- 🧪 [Tests](TESTS/README.md) — résultats des essais
+- 🚗 [Versions](VERSIONS/README.md) — évolution du véhicule
+- 📝 [Décisions](DECISIONS.md) — pourquoi un choix a été fait
+- 🕒 [Timeline](TIMELINE.md) — histoire du projet
+- 📊 [Statistiques](STATISTIQUES.md) — indicateurs du projet
+- 👨‍🏫 [Espace professeur](PROFESSEUR.md) — vue de suivi
+- 🖥️ [Interface](INTERFACE/README.md) — future interface avec choix d'équipe
+
 ## 👥 Travail en équipe
 
 Chaque membre peut contribuer au carnet de bord. Après chaque séance, utilisez **Nouvelle séance** dans les Issues.
