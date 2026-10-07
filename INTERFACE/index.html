@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Course en Cours — Tableau de bord</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div><span class="eyebrow">COURSE EN COURS</span><h1>🏎️ Tableau de bord</h1><p>Carnet de bord numérique du projet</p></div><div id="identity" class="identity"></div></header>
+<main>
+<section id="welcome" class="card welcome"><h2>👋 Première visite</h2><p>Choisis la partie du projet sur laquelle tu travailles. Tu pourras toujours la changer ensuite.</p><div id="teams" class="teams"></div></section>
+<section id="dashboard" hidden>
+<div class="hero card"><div><span class="eyebrow">TON ÉQUIPE</span><h2 id="teamName"></h2><p id="teamDesc"></p></div><button id="changeTeam" class="secondary">Changer d'équipe</button></div>
+<div class="grid" id="cards"></div>
+<div class="card"><h2>📊 Progression de toutes les équipes</h2><div id="progress"></div></div>
+<div class="grid two">
+<div class="card"><h2>⚡ Actions rapides</h2><div class="actions"><a href="../JOURNEES/README.md">📅 Nouvelle séance</a><a href="../ANNOTATIONS/README.md">💬 Annotation</a><a href="../PROBLEMES/README.md">⚠️ Problème</a><a href="../IDEES/README.md">💡 Idée</a><a href="../TESTS/README.md">🧪 Test</a></div></div>
+<div class="card"><h2>👑 Administration</h2><p id="adminText"></p><a id="adminLink" class="admin" href="../EQUIPE.md">⚙️ Gestion du projet</a></div>
+</div>
+</section>
+</main>
+<footer>Interface V2.1 · Les permissions réelles restent celles de GitHub.</footer>
+<script src="app.js"></script>
+</body></html>
