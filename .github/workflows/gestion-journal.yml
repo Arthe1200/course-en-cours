@@ -1,0 +1,36 @@
+name: Gestion automatique du journal
+
+on:
+  push:
+    paths:
+      - 'JOURNEES/**'
+      - 'SUIVI/**'
+      - 'scripts/gestion_journal.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  journal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+      - name: Préparer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Mettre à jour les historiques
+        run: python scripts/gestion_journal.py
+      - name: Enregistrer les changements
+        run: |
+          git config user.name "course-en-cours-bot"
+          git config user.email "actions@github.com"
+          git add JOURNEES SUIVI
+          if git diff --cached --quiet; then
+            echo "Aucune mise à jour automatique."
+          else
+            git commit -m "chore: mise à jour automatique du journal [skip ci]"
+            git push
+          fi
