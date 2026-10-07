@@ -1,6 +1,8 @@
 name: Gestion automatique du journal
 
 on:
+  issues:
+    types: [opened]
   push:
     paths:
       - 'JOURNEES/**'
@@ -10,19 +12,49 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
-  journal:
+  nouvelle-seance:
+    if: github.event_name == 'issues' && startsWith(github.event.issue.title, 'Nouvelle séance')
     runs-on: ubuntu-latest
     steps:
-      - name: Récupérer le dépôt
-        uses: actions/checkout@v4
-      - name: Préparer Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - name: Créer le dossier de la journée
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          DATE=$(printf '%s' "$ISSUE_BODY" | sed -n '/<!-- DATE:/,/-->/p' | sed -E 's/.*DATE: ([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' | head -1)
+          if ! printf '%s' "$DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+            echo "Date invalide ou absente."
+            exit 1
+          fi
+          mkdir -p "JOURNEES/$DATE/photos" "JOURNEES/$DATE/fichiers" "JOURNEES/$DATE/comptes-rendus"
+          cat > "JOURNEES/$DATE/README.md" <<EOF
+          # Séance du $DATE
+
+          $ISSUE_BODY
+          EOF
+          touch "JOURNEES/$DATE/photos/.gitkeep" "JOURNEES/$DATE/fichiers/.gitkeep" "JOURNEES/$DATE/comptes-rendus/.gitkeep"
+          git config user.name "course-en-cours-bot"
+          git config user.email "actions@github.com"
+          git add JOURNEES
+          git commit -m "chore: créer la journée $DATE [skip ci]" || exit 0
+          git push
+      - name: Fermer la séance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue close ${{ github.event.issue.number }} --comment "✅ Journée créée automatiquement dans `JOURNEES/`."
+
+  mise-a-jour-historique:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Mettre à jour les historiques
-        run: python scripts/gestion_journal.py
+      - run: python scripts/gestion_journal.py
       - name: Enregistrer les changements
         run: |
           git config user.name "course-en-cours-bot"
@@ -34,3 +66,9 @@ jobs:
             git commit -m "chore: mise à jour automatique du journal [skip ci]"
             git push
           fi
+
+  lancement-manuel:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Workflow disponible pour lancement manuel."
