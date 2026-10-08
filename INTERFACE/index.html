@@ -1,39 +1,48 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Course en Cours — Espace projet</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="loginView" class="login-shell">
+  <div class="login-card">
+    <div class="brand-mark">🏎️</div>
+    <span class="eyebrow">COURSE EN COURS</span>
+    <h1>Carnet de bord du projet</h1>
+    <p>Connecte-toi avec les identifiants qui t'ont été attribués.</p>
+    <form id="loginForm">
+      <label>Identifiant<input id="username" autocomplete="username" required></label>
+      <label>Mot de passe<input id="password" type="password" autocomplete="current-password" required></label>
+      <button class="button primary" type="submit">Se connecter</button>
+      <p id="loginError" class="error" hidden></p>
+    </form>
+  </div>
+</div>
+<div id="appView" hidden>
 <header class="topbar">
   <div class="brand"><div class="logo">🏎️</div><div><span>COURSE EN COURS</span><h1>Espace projet</h1></div></div>
-  <div class="top-actions"><span id="identity" class="identity"></span><button id="teamBtn" class="ghost">Changer d’équipe</button><button id="roleBtn" class="ghost">Changer de vue</button></div>
+  <div class="top-actions"><span id="identity" class="identity"></span><button id="logoutBtn" class="ghost">Déconnexion</button></div>
 </header>
 <div class="layout">
-  <aside class="sidebar">
-    <nav>
-      <button class="nav active" data-page="accueil">🏠 <span>Accueil</span></button>
-      <button class="nav" data-page="progression">📊 <span>Progression</span></button>
-      <button class="nav" data-page="equipes">👥 <span>Équipes</span></button>
-      <button class="nav" data-page="journal">📅 <span>Journal</span></button>
-      <button class="nav" data-page="annotations">💬 <span>Annotations</span></button>
-      <button class="nav" data-page="problemes">⚠️ <span>Problèmes</span></button>
-      <button class="nav" data-page="idees">💡 <span>Idées</span></button>
-      <button class="nav" data-page="tests">🧪 <span>Tests</span></button>
-    </nav>
-    <div class="side-bottom"><div class="mini">📁 <div><b>Documents</b><small>Voir le dépôt GitHub</small></div></div><a class="github" href="https://github.com/Arthe1200/course-en-cours" target="_blank">Ouvrir GitHub ↗</a></div>
-  </aside>
-  <main>
-    <div id="welcome" class="welcome card">
-      <div><span class="eyebrow">PREMIÈRE VISITE</span><h2>Bienvenue dans le projet 👋</h2><p>Choisis ton équipe. Tu pourras consulter le travail de tout le groupe et utiliser les outils de suivi.</p></div>
-      <div id="teams" class="team-grid"></div>
-    </div>
-    <section id="app" hidden>
-      <div id="page"></div>
-    </section>
-  </main>
+<aside class="sidebar">
+<nav>
+<button class="nav active" data-page="accueil">🏠 <span>Accueil</span></button>
+<button class="nav" data-page="progression">📊 <span>Progression</span></button>
+<button class="nav" data-page="equipes">👥 <span>Équipes</span></button>
+<button class="nav" data-page="journal">📅 <span>Journal</span></button>
+<button class="nav" data-page="annotations">💬 <span>Annotations</span></button>
+<button class="nav" data-page="problemes">⚠️ <span>Problèmes</span></button>
+<button class="nav" data-page="idees">💡 <span>Idées</span></button>
+<button class="nav" data-page="tests">🧪 <span>Tests</span></button>
+<button id="adminNav" class="nav" data-page="admin" hidden>⚙️ <span>Administration</span></button>
+</nav>
+<div class="side-bottom"><div class="mini">🔐 <div><b>Compte connecté</b><small>Permissions selon ton compte</small></div></div><a class="github" href="https://github.com/Arthe1200/course-en-cours" target="_blank">Ouvrir GitHub ↗</a></div>
+</aside>
+<main><section id="page"></section></main>
 </div>
-<div id="roleModal" class="modal" hidden><div class="modal-box"><button id="closeRole" class="close">×</button><span class="eyebrow">MODE D'AFFICHAGE</span><h2>Qui es-tu ?</h2><p>Cette sélection personnalise l'interface. Les vraies permissions restent celles de GitHub.</p><div class="role-grid"><button data-role="eleve">👨‍🎓<b>Élève</b><small>Travail, annotations, idées, problèmes</small></button><button data-role="prof">👨‍🏫<b>Professeur</b><small>Suivi, validation et vue globale</small></button><button data-role="admin">👑<b>Administrateur</b><small>Gestion complète du projet</small></button></div></div></div>
-<script src="app.js"></script>
+</div>
+<script src="config.js"></script><script src="app.js"></script>
 </body></html>
