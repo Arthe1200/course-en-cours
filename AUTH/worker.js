@@ -104,7 +104,27 @@ export default {
       }
 
       const user = await current(request, env);
-      if (!user || user.role !== "admin") return json(env, { error: "forbidden" }, 403);
+      if (!user) return json(env, { error: "unauthorized" }, 401);
+
+      if (url.pathname === "/api/annotations" && request.method === "GET") {
+        const result = await env.DB.prepare(
+          "SELECT a.id,a.content,a.team,a.created_at,u.username,u.role FROM annotations a JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC"
+        ).all();
+        return json(env, { annotations: result.results });
+      }
+
+      if (url.pathname === "/api/annotations" && request.method === "POST") {
+        const body = await request.json();
+        const content = String(body.content || "").trim();
+        if (!content) return json(env, { error: "missing_content" }, 400);
+        if (content.length > 2000) return json(env, { error: "content_too_long" }, 400);
+        await env.DB.prepare(
+          "INSERT INTO annotations(user_id,content,team,created_at) VALUES(?,?,?,datetime('now'))"
+        ).bind(user.id, content, user.team || null).run();
+        return json(env, { ok: true });
+      }
+
+      if (user.role !== "admin") return json(env, { error: "forbidden" }, 403);
 
       if (url.pathname === "/api/users" && request.method === "GET") {
         const result = await env.DB.prepare("SELECT id,username,role,team,active,created_at FROM users ORDER BY username").all();
