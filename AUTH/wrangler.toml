@@ -1,0 +1,11 @@
+name = "course-en-cours-auth"
+main = "worker.js"
+compatibility_date = "2026-10-08"
+
+[vars]
+SITE_ORIGIN = "https://arthe1200.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "course-en-cours"
+database_id = "REMPLACER_PAR_LE_DATABASE_ID"
