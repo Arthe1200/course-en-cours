@@ -8,4 +8,4 @@ SITE_ORIGIN = "https://arthe1200.github.io"
 [[d1_databases]]
 binding = "DB"
 database_name = "course-en-cours"
-database_id = "REMPLACER_PAR_LE_DATABASE_ID"
+database_id = "d223e889-4e70-497e-9e2a-0d71820154e4"
