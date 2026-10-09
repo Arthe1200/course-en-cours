@@ -65,7 +65,7 @@ async function callGrok(env,messages,maxTokens=1400) {
   const payload=await response.json().catch(()=>({}));
   if(!response.ok) {
     const status=response.status;
-    if(status===400){const detail=String(payload?.error?.message||payload?.message||"").toLowerCase();if(/image|mime|format|media type/.test(detail))throw new Error("grok_image_format_unsupported");if(/model/.test(detail))throw new Error("grok_model_not_found");throw new Error("grok_bad_request");}
+    if(status===400){const raw=String(payload?.error?.message||payload?.message||"");const detail=raw.toLowerCase();const err=new Error(/image|mime|format|media type/.test(detail)?"grok_image_format_unsupported":/model/.test(detail)?"grok_model_not_found":"grok_bad_request");err.grokDetail=raw.replace(/[\\r\\n\\t]+/g," ").replace(/Bearer\\s+\\S+/gi,"Bearer [masqué]").replace(/sk-[A-Za-z0-9_-]+/g,"[clé masquée]").slice(0,240);throw err;}
     if(status===401)throw new Error("grok_api_auth_failed");
     if(status===403)throw new Error("grok_api_forbidden");
     if(status===404)throw new Error("grok_model_not_found");
@@ -250,7 +250,7 @@ export default {
         const context=await collectAiContext(env),prompt=aiPrompt(context);
         const content=[{type:"text",text:prompt+"\nQuestion : "+question+"\nRéponds en français clairement, sans inventer."},...context.images.slice(0,4).map(p=>({type:"image_url",image_url:{url:p.data_url,detail:"low"}}))];
         try{const answer=await callGrok(env,[{role:"system",content:"Tu es Grok, assistant en lecture seule du projet Course en Cours. Tu ne peux modifier aucune donnée."},{role:"user",content}],1600);return json(env,{answer,model:env.GROK_MODEL||"grok-4.7",images_considered:Math.min(context.images.length,4),images_available:context.images.length});}
-        catch(err){const error=grokPublicError(err,"grok_request_failed");return json(env,{error},error==="grok_not_configured"?503:502);}
+        catch(err){const error=grokPublicError(err,"grok_request_failed");const detail=err?.grokDetail?("Détail renvoyé par xAI : "+err.grokDetail):undefined;return json(env,{error,...(detail?{detail}:{})},error==="grok_not_configured"?503:502);}
       }
       if(url.pathname==="/api/ai/journal"&&request.method==="GET"){
         const result=await env.DB.prepare("SELECT id,entry_date,title,content,generated_at,model FROM ai_journal ORDER BY entry_date DESC").all();
