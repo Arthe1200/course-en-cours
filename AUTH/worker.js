@@ -57,15 +57,15 @@ async function collectAiContext(env) {
   return {users:users.results,progress:progress.results,annotations:annotations.results,items:items.results,all_image_metadata,images};
 }
 async function callGrok(env,messages,maxTokens=1400) {
-  if(!env.GROK_API_KEY)throw new Error("grok_not_configured");
+  if(!env.GROQ_API_KEY)throw new Error("grok_not_configured");
   let response;
   try {
-    response=await fetch("https://api.x.ai/v1/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+env.GROK_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({model:env.GROK_MODEL||"grok-4.7",messages,temperature:0.2,max_tokens:maxTokens})});
+    response=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+env.GROQ_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({model:env.GROQ_MODEL||"qwen/qwen3.8-27b",messages,temperature:0.2,max_completion_tokens:maxTokens})});
   } catch { throw new Error("grok_network_error"); }
   const payload=await response.json().catch(()=>({}));
   if(!response.ok) {
     const status=response.status;
-    if(status===400){const raw=String(payload?.error?.message||payload?.message||payload?.error?.code||JSON.stringify(payload)||"Réponse xAI sans détail");const normalized=raw.toLowerCase();const err=new Error(/image|mime|format|media type/.test(normalized)?"grok_image_format_unsupported":/model/.test(normalized)?"grok_model_not_found":"grok_bad_request");err.grokDetail=raw.replace(/\s+/g," ").replace(/Bearer\s+\S+/gi,"Bearer [masqué]").replace(/sk-[A-Za-z0-9_-]+/g,"[clé masquée]").slice(0,240);throw err;}
+    if(status===400){const raw=String(payload?.error?.message||payload?.message||payload?.error?.code||JSON.stringify(payload)||"Réponse GroqCloud sans détail");const normalized=raw.toLowerCase();const err=new Error(/image|mime|format|media type/.test(normalized)?"grok_image_format_unsupported":/model/.test(normalized)?"grok_model_not_found":"grok_bad_request");err.grokDetail=raw.replace(/\s+/g," ").replace(/Bearer\s+\S+/gi,"Bearer [masqué]").replace(/sk-[A-Za-z0-9_-]+/g,"[clé masquée]").slice(0,240);throw err;}
     if(status===401)throw new Error("grok_api_auth_failed");
     if(status===403)throw new Error("grok_api_forbidden");
     if(status===404)throw new Error("grok_model_not_found");
@@ -249,8 +249,8 @@ export default {
         if(!question||question.length>2000)return json(env,{error:"invalid_question"},400);
         const context=await collectAiContext(env),prompt=aiPrompt(context);
         const content=[{type:"text",text:prompt+"\nQuestion : "+question+"\nRéponds en français clairement, sans inventer."},...context.images.slice(0,4).map(p=>({type:"image_url",image_url:{url:p.data_url,detail:"low"}}))];
-        try{const answer=await callGrok(env,[{role:"system",content:"Tu es Grok, assistant en lecture seule du projet Course en Cours. Tu ne peux modifier aucune donnée."},{role:"user",content}],1600);return json(env,{answer,model:env.GROK_MODEL||"grok-4.7",images_considered:Math.min(context.images.length,4),images_available:context.images.length});}
-        catch(err){const error=grokPublicError(err,"grok_request_failed");const detail=err?.grokDetail?("Détail renvoyé par xAI : "+err.grokDetail):undefined;return json(env,{error,...(detail?{detail}:{})},error==="grok_not_configured"?503:502);}
+        try{const answer=await callGrok(env,[{role:"system",content:"Tu es Grok, assistant en lecture seule du projet Course en Cours. Tu ne peux modifier aucune donnée."},{role:"user",content}],1600);return json(env,{answer,model:env.GROQ_MODEL||"qwen/qwen3.8-27b",images_considered:Math.min(context.images.length,4),images_available:context.images.length});}
+        catch(err){const error=grokPublicError(err,"grok_request_failed");const detail=err?.grokDetail?("Détail renvoyé par GroqCloud : "+err.grokDetail):undefined;return json(env,{error,...(detail?{detail}:{})},error==="grok_not_configured"?503:502);}
       }
       if(url.pathname==="/api/ai/journal"&&request.method==="GET"){
         const result=await env.DB.prepare("SELECT id,entry_date,title,content,generated_at,model FROM ai_journal ORDER BY entry_date DESC").all();
@@ -272,13 +272,13 @@ export default {
           const parsed=JSON.parse(raw.replace(/^\`\`\`json\s*/i,"").replace(/\`\`\`\s*$/,""));
           const title=String(parsed.journal?.title||("Journal de bord du "+date)).slice(0,160);
           const textContent=String(parsed.journal?.content||"Aucun compte rendu fourni.").slice(0,12000);
-          await env.DB.prepare("INSERT INTO ai_journal(entry_date,title,content,generated_at,model) VALUES(?,?,?,datetime('now'),?) ON CONFLICT(entry_date) DO UPDATE SET title=excluded.title,content=excluded.content,generated_at=excluded.generated_at,model=excluded.model").bind(date,title,textContent,env.GROK_MODEL||"grok-4.7").run();
+          await env.DB.prepare("INSERT INTO ai_journal(entry_date,title,content,generated_at,model) VALUES(?,?,?,datetime('now'),?) ON CONFLICT(entry_date) DO UPDATE SET title=excluded.title,content=excluded.content,generated_at=excluded.generated_at,model=excluded.model").bind(date,title,textContent,env.GROQ_MODEL||"qwen/qwen3.8-27b").run();
           await env.DB.prepare("DELETE FROM ai_suggestions WHERE entry_date=?").bind(date).run();
           let count=0;
           for(const suggestion of (Array.isArray(parsed.suggestions)?parsed.suggestions:[]).slice(0,4)){
             const st=String(suggestion.title||"").trim().slice(0,160),sc=String(suggestion.content||"").trim().slice(0,3000);
             if(!st||!sc)continue;
-            await env.DB.prepare("INSERT INTO ai_suggestions(title,content,entry_date,created_at,model) VALUES(?,?,?,datetime('now'),?)").bind(st,sc,date,env.GROK_MODEL||"grok-4.7").run();count++;
+            await env.DB.prepare("INSERT INTO ai_suggestions(title,content,entry_date,created_at,model) VALUES(?,?,?,datetime('now'),?)").bind(st,sc,date,env.GROQ_MODEL||"qwen/qwen3.8-27b").run();count++;
           }
           return json(env,{ok:true,date,title,suggestions_added:count});
         }catch(err){const error=grokPublicError(err,"journal_generation_failed");return json(env,{error},error==="grok_not_configured"?503:502);}
