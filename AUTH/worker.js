@@ -276,9 +276,11 @@ export default {
             const targetUser=await env.DB.prepare("SELECT team FROM users WHERE id=?").bind(id).first();
             if (!targetUser.team) return json(env,{error:"leader_needs_team"},400);
             const roleCheck=await env.DB.prepare("SELECT role FROM users WHERE id=?").bind(id).first();
-            if (roleCheck.role !== "eleve") return json(env,{error:"leader_must_be_student"},400);
-            await env.DB.prepare("DELETE FROM team_leaders WHERE team=? OR user_id=?").bind(targetUser.team,id).run();
-            await env.DB.prepare("INSERT INTO team_leaders(user_id,team,assigned_at) VALUES(?,?,datetime('now'))").bind(id,targetUser.team).run();
+            if (roleCheck.role !== "eleve") { await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run(); }
+            else {
+              await env.DB.prepare("DELETE FROM team_leaders WHERE team=? OR user_id=?").bind(targetUser.team,id).run();
+              await env.DB.prepare("INSERT INTO team_leaders(user_id,team,assigned_at) VALUES(?,?,datetime('now'))").bind(id,targetUser.team).run();
+            }
           } else await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
         }
         return json(env,{ok:true});
