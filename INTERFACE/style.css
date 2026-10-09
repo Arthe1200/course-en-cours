@@ -35,3 +35,32 @@ body{min-height:100vh}
 .success{padding:10px 12px;background:#ecfdf3;color:#027a48;border-radius:10px}
 .button:disabled{opacity:.65;cursor:wait}
 @media(max-width:700px){.item-list,.member-list{grid-template-columns:1fr}.member-list{padding-left:0}.team-card summary{gap:7px}.team-card summary .muted{font-size:11px}}
+
+/* Choix d'équipe, pièces jointes et espaces par rôle */
+.team-picker-shell{min-height:100vh;display:grid;place-items:center;padding:24px;background:#101820}
+.team-picker-card{width:min(650px,100%);padding:34px;background:#fff;border-radius:22px;box-shadow:0 24px 70px #0005}
+.team-picker-card h1{margin:8px 0 12px;font-size:30px}
+.team-picker-card>p{color:#667085;line-height:1.6}
+.warning-red{padding:16px;margin:18px 0;background:#fff0f0;border:2px solid #d92d20;color:#b42318;border-radius:12px;font-weight:800;line-height:1.5}
+.team-picker-card form{margin-top:20px}
+.team-picker-card select{width:100%;padding:13px;border:1px solid #d7dce2;border-radius:10px}
+.top-actions{display:flex;align-items:center;gap:8px}
+.top-actions .identity{margin-right:4px}
+.top-actions .ghost{white-space:nowrap}
+.team-subtabs{display:flex;flex-wrap:wrap;gap:8px;padding:0 0 16px 34px}
+.button.secondary{background:#eef1f4;color:#17202a}
+.readonly-note{padding:13px 15px;background:#f4f6f8;border:1px solid #dfe3e8;border-radius:12px;color:#475467;margin:12px 0}
+.private-banner{padding:15px 17px;border:1px solid #b8a4f5;background:#f5f1ff;color:#482a8a;border-radius:13px;margin:14px 0}
+.photo-gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px}
+.photo-gallery a{display:block;border:1px solid #e4e7eb;border-radius:12px;overflow:hidden;background:#f8fafc}
+.photo-gallery img{display:block;width:100%;height:180px;object-fit:contain}
+.photo-count{font-size:12px;color:#475467}
+#sketchCanvas{display:block;width:100%;height:220px;background:#fff;border:1px solid #cfd4dc;border-radius:12px;touch-action:none;cursor:crosshair;margin:8px 0}
+.user-admin-card{padding:14px;border:1px solid #e4e7eb;border-radius:13px;display:grid;gap:10px}
+.admin-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.admin-controls label{display:grid;gap:5px;font-size:12px;color:#475467}
+.admin-controls select{width:100%;padding:9px;border:1px solid #d7dce2;border-radius:9px}
+.admin-controls .leader-check{display:flex;align-items:center;gap:8px;grid-column:1/-1}
+.user-msg{margin:0}
+.progress-slider:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:700px){.team-picker-card{padding:22px}.team-picker-card h1{font-size:25px}.team-subtabs{padding-left:0}.photo-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.photo-gallery img{height:130px}.admin-controls{grid-template-columns:1fr}.top-actions .ghost{padding:8px 9px;font-size:12px}}
