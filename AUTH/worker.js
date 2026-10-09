@@ -110,24 +110,89 @@ export default {
         const result = await env.DB.prepare(
           "SELECT a.id,a.content,a.team,a.created_at,u.username,u.role FROM annotations a JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC"
         ).all();
-        return json(env, { annotations: result.results });
+        const annotations = await Promise.all(result.results.map(async a => {
+          const photos = await env.DB.prepare("SELECT id,filename,mime_type,data_url FROM attachments WHERE parent_type='annotation' AND parent_id=? ORDER BY id").bind(a.id).all();
+          return { ...a, photos: photos.results };
+        }));
+        return json(env, { annotations });
       }
 
       if (url.pathname === "/api/annotations" && request.method === "POST") {
+        if (user.role === "prof") return json(env, { error: "read_only" }, 403);
+        if (!user.team && user.role !== "admin") return json(env, { error: "choose_team_first" }, 409);
         const body = await request.json();
         const content = String(body.content || "").trim();
+        const photos = Array.isArray(body.photos) ? body.photos : [];
         if (!content) return json(env, { error: "missing_content" }, 400);
-        if (content.length > 2000) return json(env, { error: "content_too_long" }, 400);
-        await env.DB.prepare(
-          "INSERT INTO annotations(user_id,content,team,created_at) VALUES(?,?,?,datetime('now'))"
-        ).bind(user.id, content, user.team || null).run();
-        return json(env, { ok: true });
+        if (content.length > 2000 || photos.length > 4) return json(env, { error: "content_too_long" }, 400);
+        const result = await env.DB.prepare("INSERT INTO annotations(user_id,content,team,created_at) VALUES(?,?,?,datetime('now'))").bind(user.id, content, user.team || null).run();
+        const id = result.meta.last_row_id;
+        for (const photo of photos) {
+          if (typeof photo.data_url !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(photo.data_url) || photo.data_url.length > 850000) continue;
+          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'annotation',?,?,?,?,datetime('now'))").bind(user.id,id,String(photo.filename||"photo.jpg").slice(0,120),String(photo.mime_type||"image/jpeg"),photo.data_url).run();
+        }
+        return json(env, { ok: true, id });
       }
 
 
       if (url.pathname === "/api/teams" && request.method === "GET") {
-        const result = await env.DB.prepare("SELECT id,username,role,team FROM users WHERE active=1 ORDER BY team,username").all();
-        return json(env, { users: result.results });
+        const result = await env.DB.prepare("SELECT u.id,u.username,u.role,u.team,CASE WHEN tl.user_id IS NOT NULL THEN 1 ELSE 0 END AS is_leader FROM users u LEFT JOIN team_leaders tl ON tl.user_id=u.id WHERE u.active=1 ORDER BY u.team,u.username").all();
+        const teams = await env.DB.prepare("SELECT team,percent,updated_at FROM team_progress").all();
+        return json(env, { users: result.results, progress: teams.results });
+      }
+
+      if (url.pathname === "/api/team/select" && request.method === "POST") {
+        if (user.role === "prof") return json(env, { error: "read_only" }, 403);
+        if (user.team) return json(env, { error: "team_already_selected" }, 409);
+        const body = await request.json();
+        const team = String(body.team || "");
+        if (!["conception","modelisation-3D","materiaux","fabrication","assemblage","essais","presentation"].includes(team)) return json(env, { error: "invalid_team" }, 400);
+        await env.DB.prepare("UPDATE users SET team=? WHERE id=? AND team IS NULL").bind(team,user.id).run();
+        const updated = await env.DB.prepare("SELECT team FROM users WHERE id=?").bind(user.id).first();
+        if (!updated?.team) return json(env, { error: "team_already_selected" }, 409);
+        return json(env, { ok: true, team: updated.team });
+      }
+
+      if (url.pathname === "/api/profile" && request.method === "POST") {
+        if (user.role === "prof") return json(env, { error: "read_only" }, 403);
+        const body = await request.json();
+        const username = String(body.username || "").trim();
+        if (username.length < 3 || username.length > 40) return json(env, { error: "invalid_username" }, 400);
+        try {
+          await env.DB.prepare("UPDATE users SET username=? WHERE id=?").bind(username,user.id).run();
+        } catch { return json(env, { error: "username_exists" }, 409); }
+        if (body.password) {
+          if (String(body.password).length < 8) return json(env, { error: "password_too_short" }, 400);
+          await env.DB.prepare("UPDATE users SET password_hash=? WHERE id=?").bind(await passwordRecord(String(body.password)),user.id).run();
+        }
+        const updated = await env.DB.prepare("SELECT id,username,role,team FROM users WHERE id=?").bind(user.id).first();
+        return json(env, { ok: true, user: updated });
+      }
+
+      if (url.pathname === "/api/private-notes" && request.method === "GET") {
+        const leader = await env.DB.prepare("SELECT team FROM team_leaders WHERE user_id=?").bind(user.id).first();
+        if (!leader && user.role !== "admin") return json(env, { error: "leader_only" }, 403);
+        const result = await env.DB.prepare("SELECT id,title,content,created_at,updated_at FROM private_notes WHERE user_id=? ORDER BY updated_at DESC").bind(user.id).all();
+        const notes = await Promise.all(result.results.map(async n => {
+          const photos = await env.DB.prepare("SELECT id,filename,mime_type,data_url FROM attachments WHERE parent_type='private_note' AND parent_id=? AND owner_id=?").bind(n.id,user.id).all();
+          return { ...n, photos: photos.results };
+        }));
+        return json(env, { notes });
+      }
+
+      if (url.pathname === "/api/private-notes" && request.method === "POST") {
+        const leader = await env.DB.prepare("SELECT team FROM team_leaders WHERE user_id=?").bind(user.id).first();
+        if (!leader) return json(env, { error: "leader_only" }, 403);
+        const body = await request.json();
+        const title = String(body.title||"").trim(), content=String(body.content||"").trim(), photos=Array.isArray(body.photos)?body.photos:[];
+        if (!title || !content || title.length>140 || content.length>5000 || photos.length>4) return json(env,{error:"invalid_note"},400);
+        const result=await env.DB.prepare("INSERT INTO private_notes(user_id,title,content,created_at,updated_at) VALUES(?,?,?,datetime('now'),datetime('now'))").bind(user.id,title,content).run();
+        const id=result.meta.last_row_id;
+        for(const photo of photos){
+          if(typeof photo.data_url!=="string"||!/^data:image\/(jpeg|png|webp);base64,/.test(photo.data_url)||photo.data_url.length>850000)continue;
+          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'private_note',?,?,?,?,datetime('now'))").bind(user.id,id,String(photo.filename||"photo.jpg").slice(0,120),String(photo.mime_type||"image/jpeg"),photo.data_url).run();
+        }
+        return json(env,{ok:true,id});
       }
 
       if (url.pathname === "/api/progress" && request.method === "GET") {
@@ -136,6 +201,8 @@ export default {
       }
 
       if (url.pathname === "/api/progress" && request.method === "POST") {
+        if (user.role === "prof") return json(env, { error: "read_only" }, 403);
+        if (!user.team && user.role !== "admin") return json(env, { error: "choose_team_first" }, 409);
         const body = await request.json();
         const team = String(body.team || "");
         const percent = Number(body.percent);
@@ -148,33 +215,69 @@ export default {
         const type = url.searchParams.get("type");
         if (!["journal","problem","idea","test"].includes(type)) return json(env, { error: "invalid_type" }, 400);
         const result = await env.DB.prepare("SELECT p.id,p.type,p.title,p.content,p.team,p.session_date,p.status,p.created_at,p.updated_at,u.username FROM project_items p JOIN users u ON u.id=p.created_by WHERE p.type=? ORDER BY COALESCE(p.session_date,'9999-12-31'),p.created_at DESC").bind(type).all();
-        return json(env, { items: result.results });
+        const items = await Promise.all(result.results.map(async item => {
+          const photos = await env.DB.prepare("SELECT id,filename,mime_type,data_url FROM attachments WHERE parent_type='item' AND parent_id=? ORDER BY id").bind(item.id).all();
+          return { ...item, photos: photos.results };
+        }));
+        return json(env, { items });
       }
 
       if (url.pathname === "/api/items" && request.method === "POST") {
+        if (user.role === "prof") return json(env, { error: "read_only" }, 403);
+        if (!user.team && user.role !== "admin") return json(env, { error: "choose_team_first" }, 409);
         const body = await request.json();
         const type = String(body.type || "");
         const title = String(body.title || "").trim();
         const content = String(body.content || "").trim();
         const sessionDate = String(body.session_date || "").trim() || null;
+        const photos = Array.isArray(body.photos) ? body.photos : [];
         if (!["journal","problem","idea","test"].includes(type) || !title || !content) return json(env, { error: "missing_fields" }, 400);
-        if (title.length > 140 || content.length > 5000) return json(env, { error: "content_too_long" }, 400);
-        await env.DB.prepare("INSERT INTO project_items(type,title,content,created_by,team,session_date,status,created_at,updated_at) VALUES(?,?,?,?,?,?, 'ouvert',datetime('now'),datetime('now'))").bind(type,title,content,user.id,user.team||null,type==="journal"?sessionDate:null).run();
-        return json(env, { ok: true });
+        if (title.length > 140 || content.length > 5000 || photos.length > 4) return json(env, { error: "content_too_long" }, 400);
+        const team = user.role === "admin" && body.team ? String(body.team) : (user.team || null);
+        const result = await env.DB.prepare("INSERT INTO project_items(type,title,content,created_by,team,session_date,status,created_at,updated_at) VALUES(?,?,?,?,?,?, 'ouvert',datetime('now'),datetime('now'))").bind(type,title,content,user.id,team,type==="journal"?sessionDate:null).run();
+        const id = result.meta.last_row_id;
+        for (const photo of photos) {
+          if (typeof photo.data_url !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(photo.data_url) || photo.data_url.length > 850000) continue;
+          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'item',?,?,?,?,datetime('now'))").bind(user.id,id,String(photo.filename||"photo.jpg").slice(0,120),String(photo.mime_type||"image/jpeg"),photo.data_url).run();
+        }
+        return json(env, { ok: true, id });
       }
 
       if (url.pathname.startsWith("/api/items/") && request.method === "GET") {
         const id = Number(url.pathname.split("/").pop());
         const item = await env.DB.prepare("SELECT p.id,p.type,p.title,p.content,p.team,p.session_date,p.status,p.created_at,p.updated_at,u.username FROM project_items p JOIN users u ON u.id=p.created_by WHERE p.id=?").bind(id).first();
         if (!item) return json(env, { error: "not_found" }, 404);
-        return json(env, { item });
+        const photos = await env.DB.prepare("SELECT id,filename,mime_type,data_url FROM attachments WHERE parent_type='item' AND parent_id=? ORDER BY id").bind(id).all();
+        return json(env, { item: { ...item, photos: photos.results } });
       }
 
       if (user.role !== "admin") return json(env, { error: "forbidden" }, 403);
 
       if (url.pathname === "/api/users" && request.method === "GET") {
-        const result = await env.DB.prepare("SELECT id,username,role,team,active,created_at FROM users ORDER BY username").all();
+        const result = await env.DB.prepare("SELECT u.id,u.username,u.role,u.team,u.active,u.created_at,CASE WHEN tl.user_id IS NOT NULL THEN 1 ELSE 0 END AS is_leader FROM users u LEFT JOIN team_leaders tl ON tl.user_id=u.id ORDER BY u.username").all();
         return json(env, { users: result.results });
+      }
+
+      if (url.pathname.startsWith("/api/users/") && request.method === "PATCH") {
+        const id = Number(url.pathname.split("/").pop()), body = await request.json();
+        const target = await env.DB.prepare("SELECT id FROM users WHERE id=?").bind(id).first();
+        if (!target) return json(env,{error:"not_found"},404);
+        if (body.team !== undefined) {
+          const team = body.team || null;
+          if (team && !["conception","modelisation-3D","materiaux","fabrication","assemblage","essais","presentation"].includes(team)) return json(env,{error:"invalid_team"},400);
+          await env.DB.prepare("UPDATE users SET team=? WHERE id=?").bind(team,id).run();
+          if (!team) await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
+        }
+        if (body.role && ["eleve","prof","admin"].includes(body.role)) await env.DB.prepare("UPDATE users SET role=? WHERE id=?").bind(body.role,id).run();
+        if (body.is_leader !== undefined) {
+          if (body.is_leader) {
+            const targetUser=await env.DB.prepare("SELECT team FROM users WHERE id=?").bind(id).first();
+            if (!targetUser.team) return json(env,{error:"leader_needs_team"},400);
+            await env.DB.prepare("DELETE FROM team_leaders WHERE team=? OR user_id=?").bind(targetUser.team,id).run();
+            await env.DB.prepare("INSERT INTO team_leaders(user_id,team,assigned_at) VALUES(?,?,datetime('now'))").bind(id,targetUser.team).run();
+          } else await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
+        }
+        return json(env,{ok:true});
       }
 
       if (url.pathname === "/api/users" && request.method === "POST") {
