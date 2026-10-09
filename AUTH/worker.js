@@ -2,7 +2,7 @@ const cors = (env) => ({
   "Access-Control-Allow-Origin": env.SITE_ORIGIN,
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Allow-Headers": "Content-Type, X-Bootstrap-Key",
-  "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS"
+  "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS"
 });
 
 const json = (env, data, status = 200, extra = {}) =>
@@ -270,11 +270,13 @@ export default {
           await env.DB.prepare("UPDATE users SET team=? WHERE id=?").bind(team,id).run();
           if (!team) await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
         }
-        if (body.role && ["eleve","prof","admin"].includes(body.role)) await env.DB.prepare("UPDATE users SET role=? WHERE id=?").bind(body.role,id).run();
+        if (body.role && ["eleve","prof","admin"].includes(body.role)) { await env.DB.prepare("UPDATE users SET role=? WHERE id=?").bind(body.role,id).run(); if (body.role === "prof") await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run(); }
         if (body.is_leader !== undefined) {
           if (body.is_leader) {
             const targetUser=await env.DB.prepare("SELECT team FROM users WHERE id=?").bind(id).first();
             if (!targetUser.team) return json(env,{error:"leader_needs_team"},400);
+            const roleCheck=await env.DB.prepare("SELECT role FROM users WHERE id=?").bind(id).first();
+            if (roleCheck.role !== "eleve") return json(env,{error:"leader_must_be_student"},400);
             await env.DB.prepare("DELETE FROM team_leaders WHERE team=? OR user_id=?").bind(targetUser.team,id).run();
             await env.DB.prepare("INSERT INTO team_leaders(user_id,team,assigned_at) VALUES(?,?,datetime('now'))").bind(id,targetUser.team).run();
           } else await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
