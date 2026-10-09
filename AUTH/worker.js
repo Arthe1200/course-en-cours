@@ -65,7 +65,7 @@ async function callGrok(env,messages,maxTokens=1400) {
   const payload=await response.json().catch(()=>({}));
   if(!response.ok) {
     const status=response.status;
-    if(status===400){const raw=String(payload?.error?.message||payload?.message||"");const detail=raw.toLowerCase();const err=new Error(/image|mime|format|media type/.test(detail)?"grok_image_format_unsupported":/model/.test(detail)?"grok_model_not_found":"grok_bad_request");err.grokDetail=raw.replace(/[\\r\\n\\t]+/g," ").replace(/Bearer\\s+\\S+/gi,"Bearer [masqué]").replace(/sk-[A-Za-z0-9_-]+/g,"[clé masquée]").slice(0,240);throw err;}
+    if(status===400){const raw=String(payload?.error?.message||payload?.message||payload?.error?.code||JSON.stringify(payload)||"Réponse xAI sans détail");const normalized=raw.toLowerCase();const err=new Error(/image|mime|format|media type/.test(normalized)?"grok_image_format_unsupported":/model/.test(normalized)?"grok_model_not_found":"grok_bad_request");err.grokDetail=raw.replace(/\s+/g," ").replace(/Bearer\s+\S+/gi,"Bearer [masqué]").replace(/sk-[A-Za-z0-9_-]+/g,"[clé masquée]").slice(0,240);throw err;}
     if(status===401)throw new Error("grok_api_auth_failed");
     if(status===403)throw new Error("grok_api_forbidden");
     if(status===404)throw new Error("grok_model_not_found");
