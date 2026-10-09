@@ -44,18 +44,17 @@ async function tokenHash(token) {
 
 
 async function collectAiContext(env) {
-  const [users,progress,annotations,items,notes,attachments] = await Promise.all([
+  const [users,progress,annotations,items,attachments] = await Promise.all([
     env.DB.prepare("SELECT id,username,role,team,active,created_at FROM users ORDER BY team,username").all(),
     env.DB.prepare("SELECT team,percent,updated_at FROM team_progress").all(),
     env.DB.prepare("SELECT a.id,a.content,a.team,a.created_at,u.username FROM annotations a JOIN users u ON u.id=a.user_id ORDER BY a.created_at").all(),
     env.DB.prepare("SELECT p.id,p.type,p.title,p.content,p.team,p.session_date,p.status,p.created_at,p.updated_at,u.username FROM project_items p JOIN users u ON u.id=p.created_by ORDER BY p.created_at").all(),
-    env.DB.prepare("SELECT n.id,n.title,n.content,n.created_at,n.updated_at,u.username,u.team FROM private_notes n JOIN users u ON u.id=n.user_id ORDER BY n.created_at").all(),
-    env.DB.prepare("SELECT id,owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at FROM attachments ORDER BY created_at DESC").all()
+    env.DB.prepare("SELECT id,owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at FROM attachments WHERE parent_type IN ('annotation','item') ORDER BY created_at DESC").all()
   ]);
   const imageRows=attachments.results;
   const all_image_metadata=imageRows.map(({id,owner_id,parent_type,parent_id,filename,mime_type,created_at})=>({id,owner_id,parent_type,parent_id,filename,mime_type,created_at}));
-  const images=imageRows.slice(0,12).map(({id,parent_type,parent_id,filename,mime_type,created_at,data_url})=>({id,parent_type,parent_id,filename,mime_type,created_at,data_url}));
-  return {users:users.results,progress:progress.results,annotations:annotations.results,items:items.results,private_notes:notes.results,all_image_metadata,images};
+  const images=imageRows.map(({id,parent_type,parent_id,filename,mime_type,created_at,data_url})=>({id,parent_type,parent_id,filename,mime_type,created_at,data_url}));
+  return {users:users.results,progress:progress.results,annotations:annotations.results,items:items.results,all_image_metadata,images};
 }
 async function callGrok(env,messages,maxTokens=1400) {
   if(!env.GROK_API_KEY)throw new Error("grok_not_configured");
