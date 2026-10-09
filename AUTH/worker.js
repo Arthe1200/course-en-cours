@@ -276,10 +276,10 @@ export default {
         if (!validTeams.includes(team)) return json(env,{error:"invalid_team"},400);
         if (!["todo","doing","blocked","done"].includes(status)) return json(env,{error:"invalid_task_status"},400);
         if (!["low","normal","high","urgent"].includes(priority)) return json(env,{error:"invalid_task_priority"},400);
-        if (dueDate && !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate)) return json(env,{error:"invalid_due_date"},400);
-        const rawLinks = Array.isArray(body.file_links) ? body.file_links : String(body.file_links || "").split(/\\r?\\n/);
+        if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return json(env,{error:"invalid_due_date"},400);
+        const rawLinks = Array.isArray(body.file_links) ? body.file_links : String(body.file_links || "").split(/\r?\n/);
         const fileLinks = rawLinks.map(v=>String(v||"").trim()).filter(Boolean);
-        if (fileLinks.length > 10 || fileLinks.some(v=>v.length>500 || !/^https?:\\/\\//i.test(v))) return json(env,{error:"invalid_file_links"},400);
+        if (fileLinks.length > 10 || fileLinks.some(v=>v.length>500 || !/^https?:\/\//i.test(v))) return json(env,{error:"invalid_file_links"},400);
         let assignee = null;
         const assigneeUsername = String(body.assignee_username || "").trim();
         if (assigneeUsername) {
@@ -313,11 +313,11 @@ export default {
         if (!validTeams.includes(team)) return json(env,{error:"invalid_team"},400);
         if (!["todo","doing","blocked","done"].includes(status)) return json(env,{error:"invalid_task_status"},400);
         if (!["low","normal","high","urgent"].includes(priority)) return json(env,{error:"invalid_task_priority"},400);
-        if (dueDate && !/^\\d{4}-\\d{2}-\\d{2}$/.test(dueDate)) return json(env,{error:"invalid_due_date"},400);
+        if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return json(env,{error:"invalid_due_date"},400);
         const currentLinks = (() => { try { return JSON.parse(old.file_links || "[]"); } catch { return []; } })();
-        const rawLinks = body.file_links === undefined ? currentLinks : (Array.isArray(body.file_links) ? body.file_links : String(body.file_links || "").split(/\\r?\\n/));
+        const rawLinks = body.file_links === undefined ? currentLinks : (Array.isArray(body.file_links) ? body.file_links : String(body.file_links || "").split(/\r?\n/));
         const fileLinks = rawLinks.map(v=>String(v||"").trim()).filter(Boolean);
-        if (fileLinks.length > 10 || fileLinks.some(v=>v.length>500 || !/^https?:\\/\\//i.test(v))) return json(env,{error:"invalid_file_links"},400);
+        if (fileLinks.length > 10 || fileLinks.some(v=>v.length>500 || !/^https?:\/\//i.test(v))) return json(env,{error:"invalid_file_links"},400);
         let assignee = null;
         const assigneeUsername = String(body.assignee_username === undefined ? (old.assignee_user_id ? (await env.DB.prepare("SELECT username FROM users WHERE id=?").bind(old.assignee_user_id).first())?.username || "" : "") : body.assignee_username).trim();
         if (assigneeUsername) {
