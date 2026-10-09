@@ -11,6 +11,24 @@ const types={journal:{label:"Journal",icon:"📅",list:"journalList"},problem:{l
 let me=null,progressState={},currentPage="accueil",teamView=null,teamTab="annotations",sketchDirty=false;
 const $=id=>document.getElementById(id);
 async function api(path,opt={}){if(!window.CEC_AUTH_API)throw new Error("Serveur de connexion non configuré");const r=await fetch(window.CEC_AUTH_API+"/api"+path,{credentials:"include",headers:{"Content-Type":"application/json"},...opt});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.detail||d.error||"Erreur serveur");return d}
+
+function grokErrorMessage(code){
+ const messages={
+  grok_not_configured:"La clé GROK_API_KEY manque dans les secrets du Worker Cloudflare.",
+  grok_api_auth_failed:"La clé API Grok est invalide ou révoquée. Vérifie GROK_API_KEY dans Cloudflare.",
+  grok_api_forbidden:"xAI refuse l’accès à cette API ou à ce modèle. Vérifie les droits et la facturation du compte xAI.",
+  grok_model_not_found:"Le modèle Grok configuré n’existe pas ou n’est pas accessible à cette clé.",
+  grok_payload_too_large:"La demande est trop volumineuse. Réessaie avec moins de photos.",
+  grok_rate_limited:"La limite de requêtes Grok est atteinte. Attends un peu puis réessaie.",
+  grok_bad_request:"xAI a refusé le format de la requête. Les détails seront vérifiés côté Worker.",
+  grok_network_error:"Le Worker n’arrive pas à joindre l’API xAI.",
+  grok_provider_unavailable:"L’API xAI est temporairement indisponible.",
+  grok_empty_response:"Grok a répondu sans contenu exploitable.",
+  grok_request_failed:"La requête Grok a échoué pour une raison non identifiée.",
+  journal_generation_failed:"La génération du journal a échoué. Vérifie la configuration Grok."
+ };
+ return messages[code]||code||"Erreur inconnue";
+}
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function roleName(){return me.role==="admin"?"👑 Administrateur":me.role==="prof"?"👨‍🏫 Professeur":me.is_leader?"⭐ Chef d’équipe":"👨‍🎓 Élève"}
 function canEdit(){return me.role!=="prof"}
@@ -33,8 +51,8 @@ document.addEventListener("submit",async e=>{
  if(e.target.id==="annotationForm"){e.preventDefault();if(!canEdit())return;const f=e.target,msg=$("annotationMsg");try{const photos=await readPhotos(f.elements.photos.files);const title=f.elements.title.value.trim(),content=f.elements.content.value.trim();await api("/annotations",{method:"POST",body:JSON.stringify({content:title+"\n"+content,photos})});f.reset();flash(msg,"Annotation publiée dans "+teamName(me.team)+".",true);loadAnnotations()}catch(err){flash(msg,err.message)}return}
  if(e.target.matches(".item-form")){e.preventDefault();if(!canEdit())return;const f=e.target,msg=f.querySelector(".form-message"),data=Object.fromEntries(new FormData(f));try{data.photos=await readPhotos(f.elements.photos?.files);data.type=f.dataset.type;await api("/items",{method:"POST",body:JSON.stringify(data)});f.reset();flash(msg,"Enregistré dans "+teamName(me.team)+".",true);loadItems(data.type,types[data.type].list)}catch(err){flash(msg,err.message)}return}
  if(e.target.id==="privateNoteForm"){e.preventDefault();const f=e.target,msg=$("privateNoteMsg");try{const photos=await readPhotos(f.elements.photos.files);if(sketchDirty){photos.push({filename:"schema-dessine.png",mime_type:"image/png",data_url:$("sketchCanvas").toDataURL("image/png")})}await api("/private-notes",{method:"POST",body:JSON.stringify({title:f.elements.title.value,content:f.elements.content.value,photos})});f.reset();clearSketch();flash(msg,"Note enregistrée dans ton espace privé.",true);loadPrivateNotes()}catch(err){flash(msg,err.message)}return}
- if(e.target.id==="aiJournalForm"){e.preventDefault();if(me.role!=="admin")return;const f=e.target,msg=$("aiJournalMsg");try{const d=await api("/ai/generate-journal",{method:"POST",body:JSON.stringify({date:f.elements.date.value})});flash(msg,"Journal du "+d.date+" généré. "+d.suggestions_added+" idée(s) ajoutée(s).",true);loadAiJournal();loadAiSuggestions()}catch(err){flash(msg,err.message==="grok_not_configured"?"Clé API Grok non configurée sur Cloudflare.":"Génération impossible : "+err.message)}return}
-  if(e.target.id==="aiChatForm"){e.preventDefault();if(me.role==="prof")return;const f=e.target,input=f.elements.question,msg=$("aiChatMsg"),log=$("aiChatLog"),question=input.value.trim();if(!question)return;log.insertAdjacentHTML("beforeend",'<div class="chat-bubble user-bubble"><b>Toi</b><p>'+esc(question)+'</p></div>');input.value="";flash(msg,"Grok analyse les données du projet…",true);try{const d=await api("/ai/chat",{method:"POST",body:JSON.stringify({question})});log.insertAdjacentHTML("beforeend",'<div class="chat-bubble ai-bubble"><b>Grok · lecture seule</b><p>'+esc(d.answer).replace(/\n/g,"<br>")+'</p><small>'+d.images_considered+' photo(s) transmises pour analyse</small></div>');msg.hidden=true;log.scrollTop=log.scrollHeight}catch(err){flash(msg,err.message==="grok_not_configured"?"Clé API Grok non configurée sur Cloudflare.":"Grok est indisponible : "+err.message)}return}
+ if(e.target.id==="aiJournalForm"){e.preventDefault();if(me.role!=="admin")return;const f=e.target,msg=$("aiJournalMsg");try{const d=await api("/ai/generate-journal",{method:"POST",body:JSON.stringify({date:f.elements.date.value})});flash(msg,"Journal du "+d.date+" généré. "+d.suggestions_added+" idée(s) ajoutée(s).",true);loadAiJournal();loadAiSuggestions()}catch(err){flash(msg,grokErrorMessage(err.message))}return}
+  if(e.target.id==="aiChatForm"){e.preventDefault();if(me.role==="prof")return;const f=e.target,input=f.elements.question,msg=$("aiChatMsg"),log=$("aiChatLog"),question=input.value.trim();if(!question)return;log.insertAdjacentHTML("beforeend",'<div class="chat-bubble user-bubble"><b>Toi</b><p>'+esc(question)+'</p></div>');input.value="";flash(msg,"Grok analyse les données du projet…",true);try{const d=await api("/ai/chat",{method:"POST",body:JSON.stringify({question})});log.insertAdjacentHTML("beforeend",'<div class="chat-bubble ai-bubble"><b>Grok · lecture seule</b><p>'+esc(d.answer).replace(/\n/g,"<br>")+'</p><small>'+d.images_considered+' photo(s) transmises pour analyse</small></div>');msg.hidden=true;log.scrollTop=log.scrollHeight}catch(err){flash(msg,grokErrorMessage(err.message))}return}
   if(e.target.id==="createUser"){e.preventDefault();const f=e.target,d=Object.fromEntries(new FormData(f)),msg=$("adminMsg");try{await api("/users",{method:"POST",body:JSON.stringify(d)});f.reset();flash(msg,"Compte créé.",true);loadUsers()}catch(err){flash(msg,err.message)}}
 });
 document.addEventListener("input",e=>{if(!e.target.matches(".progress-slider"))return;const t=e.target.dataset.team,p=Number(e.target.value),row=e.target.closest(".progressrow");row.querySelector(".fill").style.width=p+"%";$("pct-"+t).textContent=p+" %"});
