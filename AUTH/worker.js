@@ -124,6 +124,52 @@ export default {
         return json(env, { ok: true });
       }
 
+
+      if (url.pathname === "/api/teams" && request.method === "GET") {
+        const result = await env.DB.prepare("SELECT id,username,role,team FROM users WHERE active=1 ORDER BY team,username").all();
+        return json(env, { users: result.results });
+      }
+
+      if (url.pathname === "/api/progress" && request.method === "GET") {
+        const result = await env.DB.prepare("SELECT team,percent,updated_at FROM team_progress").all();
+        return json(env, { progress: result.results });
+      }
+
+      if (url.pathname === "/api/progress" && request.method === "POST") {
+        const body = await request.json();
+        const team = String(body.team || "");
+        const percent = Number(body.percent);
+        if (!["conception","modelisation-3D","materiaux","fabrication","assemblage","essais","presentation"].includes(team) || !Number.isInteger(percent) || percent < 0 || percent > 100) return json(env, { error: "invalid_progress" }, 400);
+        await env.DB.prepare("INSERT INTO team_progress(team,percent,updated_by,updated_at) VALUES(?,?,?,datetime('now')) ON CONFLICT(team) DO UPDATE SET percent=excluded.percent,updated_by=excluded.updated_by,updated_at=excluded.updated_at").bind(team,percent,user.id).run();
+        return json(env, { ok: true });
+      }
+
+      if (url.pathname === "/api/items" && request.method === "GET") {
+        const type = url.searchParams.get("type");
+        if (!["journal","problem","idea","test"].includes(type)) return json(env, { error: "invalid_type" }, 400);
+        const result = await env.DB.prepare("SELECT p.id,p.type,p.title,p.content,p.team,p.session_date,p.status,p.created_at,p.updated_at,u.username FROM project_items p JOIN users u ON u.id=p.created_by WHERE p.type=? ORDER BY COALESCE(p.session_date,'9999-12-31'),p.created_at DESC").bind(type).all();
+        return json(env, { items: result.results });
+      }
+
+      if (url.pathname === "/api/items" && request.method === "POST") {
+        const body = await request.json();
+        const type = String(body.type || "");
+        const title = String(body.title || "").trim();
+        const content = String(body.content || "").trim();
+        const sessionDate = String(body.session_date || "").trim() || null;
+        if (!["journal","problem","idea","test"].includes(type) || !title || !content) return json(env, { error: "missing_fields" }, 400);
+        if (title.length > 140 || content.length > 5000) return json(env, { error: "content_too_long" }, 400);
+        await env.DB.prepare("INSERT INTO project_items(type,title,content,created_by,team,session_date,status,created_at,updated_at) VALUES(?,?,?,?,?,?, 'ouvert',datetime('now'),datetime('now'))").bind(type,title,content,user.id,user.team||null,type==="journal"?sessionDate:null).run();
+        return json(env, { ok: true });
+      }
+
+      if (url.pathname.startsWith("/api/items/") && request.method === "GET") {
+        const id = Number(url.pathname.split("/").pop());
+        const item = await env.DB.prepare("SELECT p.id,p.type,p.title,p.content,p.team,p.session_date,p.status,p.created_at,p.updated_at,u.username FROM project_items p JOIN users u ON u.id=p.created_by WHERE p.id=?").bind(id).first();
+        if (!item) return json(env, { error: "not_found" }, 404);
+        return json(env, { item });
+      }
+
       if (user.role !== "admin") return json(env, { error: "forbidden" }, 403);
 
       if (url.pathname === "/api/users" && request.method === "GET") {
