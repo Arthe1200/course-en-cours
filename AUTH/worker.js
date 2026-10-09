@@ -84,7 +84,8 @@ export default {
         await env.DB.prepare(
           "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,datetime('now','+30 days'))"
         ).bind(await tokenHash(token), user.id).run();
-        return json(env, { user: { username: user.username, role: user.role, team: user.team } }, 200, { "Set-Cookie": setCookie(token) });
+        const leader = await env.DB.prepare("SELECT team FROM team_leaders WHERE user_id=?").bind(user.id).first();
+        return json(env, { user: { id: user.id, username: user.username, role: user.role, team: user.team, is_leader: !!leader } }, 200, { "Set-Cookie": setCookie(token) });
       }
 
       if (url.pathname === "/api/logout" && request.method === "POST") {
@@ -100,7 +101,8 @@ export default {
       if (url.pathname === "/api/me" && request.method === "GET") {
         const user = await current(request, env);
         if (!user) return json(env, { error: "unauthorized" }, 401);
-        return json(env, { user });
+        const leader = await env.DB.prepare("SELECT team FROM team_leaders WHERE user_id=?").bind(user.id).first();
+        return json(env, { user: { ...user, is_leader: !!leader } });
       }
 
       const user = await current(request, env);
