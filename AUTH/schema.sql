@@ -17,3 +17,36 @@ CREATE TABLE IF NOT EXISTS ai_journal(id INTEGER PRIMARY KEY AUTOINCREMENT,entry
 CREATE INDEX IF NOT EXISTS idx_ai_journal_date ON ai_journal(entry_date DESC);
 CREATE TABLE IF NOT EXISTS ai_suggestions(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,content TEXT NOT NULL,entry_date TEXT NOT NULL,created_at TEXT NOT NULL,model TEXT NOT NULL DEFAULT 'grok-4.7');
 CREATE INDEX IF NOT EXISTS idx_ai_suggestions_date ON ai_suggestions(entry_date DESC,created_at DESC);
+
+
+CREATE TABLE IF NOT EXISTS tasks(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  team TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo','doing','blocked','done')),
+  priority TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('low','normal','high','urgent')),
+  due_date TEXT,
+  assignee_user_id INTEGER,
+  file_links TEXT NOT NULL DEFAULT '[]',
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(assignee_user_id) REFERENCES users(id),
+  FOREIGN KEY(created_by) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_team_status ON tasks(team,status);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC);
+CREATE TABLE IF NOT EXISTS task_history(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id INTEGER NOT NULL,
+  actor_user_id INTEGER,
+  actor_username TEXT NOT NULL,
+  action TEXT NOT NULL CHECK(action IN ('created','updated')),
+  changes_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  FOREIGN KEY(actor_user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_task_history_task_date ON task_history(task_id,created_at DESC);
