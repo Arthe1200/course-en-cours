@@ -64,3 +64,6 @@ body{min-height:100vh}
 .user-msg{margin:0}
 .progress-slider:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:700px){.team-picker-card{padding:22px}.team-picker-card h1{font-size:25px}.team-subtabs{padding-left:0}.photo-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.photo-gallery img{height:130px}.admin-controls{grid-template-columns:1fr}.top-actions .ghost{padding:8px 9px;font-size:12px}}
+
+/* Assistant Grok et journal de bord IA */
+.ai-entry-list{display:grid;gap:12px}.ai-entry{padding:18px;border:1px solid #e4e7eb;border-radius:14px;background:#fff}.ai-entry h3{margin:8px 0}.ai-entry .detail-content{line-height:1.7;overflow-wrap:anywhere}.ai-chat-log{display:grid;gap:12px;max-height:480px;overflow:auto;margin:12px 0 18px}.chat-bubble{padding:14px 16px;border-radius:14px;border:1px solid #e4e7eb}.chat-bubble p{white-space:normal;line-height:1.6;margin:8px 0}.ai-bubble{background:#f5f7f9}.user-bubble{background:#eef4ff}.ai-chat-form{display:grid;gap:12px}.ai-chat-form textarea{width:100%;min-height:90px;padding:12px;border:1px solid #d7dce2;border-radius:10px;font:inherit}.ai-chat-form button{justify-self:start}
