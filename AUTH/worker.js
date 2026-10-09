@@ -53,7 +53,7 @@ async function collectAiContext(env) {
   ]);
   const imageRows=attachments.results;
   const all_image_metadata=imageRows.map(({id,owner_id,parent_type,parent_id,filename,mime_type,created_at})=>({id,owner_id,parent_type,parent_id,filename,mime_type,created_at}));
-  const images=imageRows.map(({id,parent_type,parent_id,filename,mime_type,created_at,data_url})=>({id,parent_type,parent_id,filename,mime_type,created_at,data_url}));
+  const images=imageRows.filter(p=>["image/jpeg","image/png"].includes(String(p.mime_type||"").toLowerCase()) && /^data:image\/(jpeg|png);base64,/i.test(String(p.data_url||""))).map(({id,parent_type,parent_id,filename,mime_type,created_at,data_url})=>({id,parent_type,parent_id,filename,mime_type,created_at,data_url}));
   return {users:users.results,progress:progress.results,annotations:annotations.results,items:items.results,all_image_metadata,images};
 }
 async function callGrok(env,messages,maxTokens=1400) {
@@ -65,7 +65,7 @@ async function callGrok(env,messages,maxTokens=1400) {
   const payload=await response.json().catch(()=>({}));
   if(!response.ok) {
     const status=response.status;
-    if(status===400)throw new Error("grok_bad_request");
+    if(status===400){const detail=String(payload?.error?.message||payload?.message||"").toLowerCase();if(/image|mime|format|media type/.test(detail))throw new Error("grok_image_format_unsupported");if(/model/.test(detail))throw new Error("grok_model_not_found");throw new Error("grok_bad_request");}
     if(status===401)throw new Error("grok_api_auth_failed");
     if(status===403)throw new Error("grok_api_forbidden");
     if(status===404)throw new Error("grok_model_not_found");
@@ -79,7 +79,7 @@ async function callGrok(env,messages,maxTokens=1400) {
   return content.trim();
 }
 function grokPublicError(err,task) {
-  const allowed=["grok_not_configured","grok_api_auth_failed","grok_api_forbidden","grok_model_not_found","grok_payload_too_large","grok_rate_limited","grok_bad_request","grok_network_error","grok_provider_unavailable","grok_empty_response"];
+  const allowed=["grok_not_configured","grok_image_format_unsupported","grok_api_auth_failed","grok_api_forbidden","grok_model_not_found","grok_payload_too_large","grok_rate_limited","grok_bad_request","grok_network_error","grok_provider_unavailable","grok_empty_response"];
   return allowed.includes(err?.message)?err.message:task;
 }
 function aiPrompt(context) {
