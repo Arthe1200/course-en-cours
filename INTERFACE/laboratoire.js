@@ -107,7 +107,6 @@ function setupRenderer(){
  const axes=new THREE.AxesHelper(1);scene.add(axes);
  const OrbitControlsModule=awaitOrbitControls;
 }
-let awaitOrbitControls;
 async function loadModel(file,ext){
  const OrbitControls= (await import("three/addons/controls/OrbitControls.js")).OrbitControls;
  setupRenderer();
