@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Course en Cours — Espace projet</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <div id="loginView" class="login-shell">
@@ -21,10 +21,11 @@
     </form>
   </div>
 </div>
+<div id="teamPicker" class="team-picker-shell" hidden></div>
 <div id="appView" hidden>
 <header class="topbar">
   <div class="brand"><div class="logo">🏎️</div><div><span>COURSE EN COURS</span><h1>Espace projet</h1></div></div>
-  <div class="top-actions"><span id="identity" class="identity"></span><button id="logoutBtn" class="ghost">Déconnexion</button></div>
+  <div class="top-actions"><span id="identity" class="identity"></span><button id="profileBtn" class="ghost" hidden>Profil</button><button id="logoutBtn" class="ghost">Déconnexion</button></div>
 </header>
 <div class="layout">
 <aside class="sidebar">
@@ -37,6 +38,7 @@
 <button class="nav" data-page="problemes">⚠️ <span>Problèmes</span></button>
 <button class="nav" data-page="idees">💡 <span>Idées</span></button>
 <button class="nav" data-page="tests">🧪 <span>Tests</span></button>
+<button id="leaderNav" class="nav" data-page="chef" hidden>🔒 <span>Espace privé du chef</span></button>
 <button id="adminNav" class="nav" data-page="admin" hidden>⚙️ <span>Administration</span></button>
 </nav>
 <div class="side-bottom"><div class="mini">🔐 <div><b>Compte connecté</b><small>Permissions selon ton compte</small></div></div><a class="github" href="https://github.com/Arthe1200/course-en-cours" target="_blank">Ouvrir GitHub ↗</a></div>
@@ -44,5 +46,5 @@
 <main><section id="page"></section></main>
 </div>
 </div>
-<script src="config.js?v=2"></script><script src="app.js?v=3"></script>
+<script src="config.js?v=2"></script><script src="app.js?v=4"></script>
 </body></html>
