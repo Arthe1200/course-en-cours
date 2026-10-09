@@ -15,6 +15,7 @@ async function api(path,opt={}){if(!window.CEC_AUTH_API)throw new Error("Serveur
 function grokErrorMessage(code){
  const messages={
   grok_not_configured:"La clé GROK_API_KEY manque dans les secrets du Worker Cloudflare.",
+  grok_image_format_unsupported:"Une photo utilise un format non pris en charge par Grok. Réessaie après avoir converti les photos en JPG ou PNG.",
   grok_api_auth_failed:"La clé API Grok est invalide ou révoquée. Vérifie GROK_API_KEY dans Cloudflare.",
   grok_api_forbidden:"xAI refuse l’accès à cette API ou à ce modèle. Vérifie les droits et la facturation du compte xAI.",
   grok_model_not_found:"Le modèle Grok configuré n’existe pas ou n’est pas accessible à cette clé.",
