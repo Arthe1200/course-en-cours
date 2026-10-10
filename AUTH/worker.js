@@ -139,6 +139,7 @@ export default {
 
       if (url.pathname === "/api/login" && request.method === "POST") {
         const { username, password } = await request.json();
+        await env.DB.prepare("DELETE FROM login_rate_limits WHERE window_started < datetime('now','-1 day')").run();
         const rateKey = await tokenHash(request.headers.get("CF-Connecting-IP") || "unknown");
         const rate = await env.DB.prepare("SELECT attempts FROM login_rate_limits WHERE key_hash=? AND window_started>datetime('now','-15 minutes')").bind(rateKey).first();
         if (Number(rate?.attempts || 0) >= 10) return json(env, { error: "login_rate_limited" }, 429);
