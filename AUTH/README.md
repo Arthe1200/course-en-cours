@@ -49,4 +49,4 @@ Puis pousser le changement sur main.
 
 ## Migration de l’inventaire
 
-Pour une base déjà créée, appliquer `AUTH/migrations/0002_materials.sql` avec Wrangler avant de déployer le Worker qui expose `/api/materials`. La table est aussi incluse dans `schema.sql` pour les nouvelles installations.
+Pour une base déjà créée, appliquer les migrations `AUTH/migrations/0002_materials.sql` puis `AUTH/migrations/0003_rate_limits_ai_quota.sql` avec Wrangler avant de déployer le Worker. Elles ajoutent l’inventaire, la limitation des tentatives de connexion et les quotas IA. Les tables sont aussi incluses dans `schema.sql` pour les nouvelles installations.
