@@ -390,6 +390,7 @@ export default {
         const team = String(body.team || "");
         const percent = Number(body.percent);
         if (!["conception","modelisation-3D","materiaux","fabrication","assemblage","essais","presentation"].includes(team) || !Number.isInteger(percent) || percent < 0 || percent > 100) return json(env, { error: "invalid_progress" }, 400);
+        if (user.role !== "admin" && team !== user.team) return json(env, { error: "team_progress_forbidden" }, 403);
         await env.DB.prepare("INSERT INTO team_progress(team,percent,updated_by,updated_at) VALUES(?,?,?,datetime('now')) ON CONFLICT(team) DO UPDATE SET percent=excluded.percent,updated_by=excluded.updated_by,updated_at=excluded.updated_at").bind(team,percent,user.id).run();
         return json(env, { ok: true });
       }
