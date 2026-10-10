@@ -280,3 +280,5 @@ img, canvas, video, iframe { max-width: 100%; }
   .muted,.item-meta,.material-meta{color:#444!important}
   @page{size:auto;margin:14mm}
 }
+
+.task-overdue{color:#b42318!important;font-weight:800;background:#fef3f2;padding:4px 7px;border-radius:7px}
