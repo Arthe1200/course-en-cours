@@ -15,6 +15,7 @@ async function api(path,opt={}){if(!window.CEC_AUTH_API)throw new Error("Serveur
 function grokErrorMessage(code){
  const messages={
   grok_not_configured:"La clé GROQ_API_KEY manque dans les secrets du Worker Cloudflare.",
+   ai_daily_limit_reached:"Limite quotidienne d’utilisation de l’IA atteinte. Réessaie demain.",
   grok_image_format_unsupported:"Une photo utilise un format non pris en charge par le modèle GroqCloud. Réessaie après avoir converti les photos en JPG ou PNG.",
   grok_api_auth_failed:"La clé API GroqCloud est invalide ou révoquée. Vérifie GROQ_API_KEY dans Cloudflare.",
   grok_api_forbidden:"GroqCloud refuse l’accès à cette API ou à ce modèle. Vérifie les droits et les limites du compte GroqCloud.",
@@ -43,7 +44,7 @@ function start(){if(me.role!=="prof"&&!me.team){$("appView").hidden=true;showTea
 function showLogin(){$("appView").hidden=true;$("teamPicker").hidden=true;$("loginView").hidden=false;window.scrollTo(0,0)}
 function showTeamPicker(){$("loginView").hidden=true;$("appView").hidden=true;$("teamPicker").hidden=false;$("teamPicker").innerHTML='<div class="team-picker-card"><span class="eyebrow">PREMIÈRE CONNEXION</span><h1>Choisis ton équipe</h1><div class="warning-red">⚠️ ATTENTION — CE CHOIX EST DÉFINITIF. Tu ne pourras pas le modifier toi-même après validation. Seul l’administrateur pourra le changer.</div><p>Ce choix permet de classer automatiquement tes annotations, idées, problèmes et tests dans le bon espace d’équipe.</p><form id="teamChoiceForm" class="form-grid"><label>Mon équipe<select name="team" required><option value="">Choisir une équipe…</option>'+teams.map(t=>'<option value="'+t[0]+'">'+t[1]+'</option>').join("")+'</select></label><button class="button primary" type="submit">Confirmer définitivement mon équipe</button><p id="teamChoiceMsg" hidden></p></form></div>';window.scrollTo(0,0)}
 async function boot(){try{const d=await api("/me");me=d.user;start()}catch{showLogin()}}
-$("loginForm").onsubmit=async e=>{e.preventDefault();$("loginError").hidden=true;const btn=$("loginForm").querySelector("button");btn.disabled=true;btn.textContent="Connexion…";try{const d=await api("/login",{method:"POST",body:JSON.stringify({username:$("username").value.trim(),password:$("password").value})});me=d.user;start();window.scrollTo(0,0)}catch(err){$("loginError").textContent=err.message==="invalid_credentials"?"Identifiant ou mot de passe incorrect.":err.message;$("loginError").hidden=false}finally{btn.disabled=false;btn.textContent="Se connecter"}};
+$("loginForm").onsubmit=async e=>{e.preventDefault();$("loginError").hidden=true;const btn=$("loginForm").querySelector("button");btn.disabled=true;btn.textContent="Connexion…";try{const d=await api("/login",{method:"POST",body:JSON.stringify({username:$("username").value.trim(),password:$("password").value})});me=d.user;start();window.scrollTo(0,0)}catch(err){$("loginError").textContent=err.message==="invalid_credentials"?"Identifiant ou mot de passe incorrect.":err.message==="login_rate_limited"?"Trop de tentatives. Réessaie dans 15 minutes.":err.message;$("loginError").hidden=false}finally{btn.disabled=false;btn.textContent="Se connecter"}};
 $("logoutBtn").onclick=async()=>{try{await api("/logout",{method:"POST"})}catch{}me=null;showLogin()};
 $("profileBtn").onclick=()=>render("profil");
 document.addEventListener("submit",async e=>{
