@@ -390,6 +390,7 @@ export default {
         const team = String(body.team || "");
         const percent = Number(body.percent);
         if (!["conception","modelisation-3D","materiaux","fabrication","assemblage","essais","presentation"].includes(team) || !Number.isInteger(percent) || percent < 0 || percent > 100) return json(env, { error: "invalid_progress" }, 400);
+        if (user.role !== "admin" && team !== user.team) return json(env, { error: "team_progress_forbidden" }, 403);
         await env.DB.prepare("INSERT INTO team_progress(team,percent,updated_by,updated_at) VALUES(?,?,?,datetime('now')) ON CONFLICT(team) DO UPDATE SET percent=excluded.percent,updated_by=excluded.updated_by,updated_at=excluded.updated_at").bind(team,percent,user.id).run();
         return json(env, { ok: true });
       }
@@ -436,54 +437,90 @@ export default {
 
       if (user.role !== "admin") return json(env, { error: "forbidden" }, 403);
 
+      // La gestion des comptes est strictement réservée aux administrateurs.
       if (url.pathname === "/api/users" && request.method === "GET") {
-        const result = await env.DB.prepare("SELECT u.id,u.username,u.role,u.team,u.active,u.created_at,CASE WHEN tl.user_id IS NOT NULL THEN 1 ELSE 0 END AS is_leader FROM users u LEFT JOIN team_leaders tl ON tl.user_id=u.id ORDER BY u.username").all();
+        if (user.role !== "admin") return json(env, { error: "forbidden" }, 403);
+        const result = await env.DB.prepare("SELECT u.id,u.username,u.role,u.team,u.active,u.created_at,CASE WHEN tl.user_id IS NOT NULL THEN 1 ELSE 0 END AS is_leader FROM users u LEFT JOIN team_leaders tl ON tl.user_id=u.id ORDER BY u.active DESC,u.username").all();
         return json(env, { users: result.results });
       }
 
-      if (url.pathname.startsWith("/api/users/") && request.method === "PATCH") {
-        const id = Number(url.pathname.split("/").pop()), body = await request.json();
-        const target = await env.DB.prepare("SELECT id FROM users WHERE id=?").bind(id).first();
-        if (!target) return json(env,{error:"not_found"},404);
-        if (body.team !== undefined) {
-          const team = body.team || null;
-          if (team && !["conception","modelisation-3D","materiaux","fabrication","assemblage","essais","presentation"].includes(team)) return json(env,{error:"invalid_team"},400);
-          await env.DB.prepare("UPDATE users SET team=? WHERE id=?").bind(team,id).run();
-          if (!team) await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
-        }
-        if (body.role && ["eleve","prof","admin"].includes(body.role)) { await env.DB.prepare("UPDATE users SET role=? WHERE id=?").bind(body.role,id).run(); if (body.role === "prof") await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run(); }
-        if (body.is_leader !== undefined) {
-          if (body.is_leader) {
-            const targetUser=await env.DB.prepare("SELECT team FROM users WHERE id=?").bind(id).first();
-            if (!targetUser.team) return json(env,{error:"leader_needs_team"},400);
-            const roleCheck=await env.DB.prepare("SELECT role FROM users WHERE id=?").bind(id).first();
-            if (roleCheck.role !== "eleve") { await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run(); }
-            else {
-              await env.DB.prepare("DELETE FROM team_leaders WHERE team=? OR user_id=?").bind(targetUser.team,id).run();
-              await env.DB.prepare("INSERT INTO team_leaders(user_id,team,assigned_at) VALUES(?,?,datetime('now'))").bind(id,targetUser.team).run();
-            }
-          } else await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
-        }
-        return json(env,{ok:true});
-      }
-
       if (url.pathname === "/api/users" && request.method === "POST") {
-        const { username, password, role, team } = await request.json();
-        if (!username || !password || !role) return json(env, { error: "missing_fields" }, 400);
+        if (user.role !== "admin") return json(env, { error: "forbidden" }, 403);
+        const body = await request.json();
+        const username = String(body.username || "").trim();
+        const password = String(body.password || "");
+        const role = String(body.role || "");
+        const team = String(body.team || "") || null;
+        const validTeams = ["conception","modelisation-3D","materiaux","fabrication","assemblage","essais","presentation"];
+        if (!/^[A-Za-z0-9._-]{3,40}$/.test(username)) return json(env, { error: "invalid_username" }, 400);
+        if (password.length < 8 || password.length > 256) return json(env, { error: "password_too_short" }, 400);
+        if (!["eleve","prof","admin"].includes(role)) return json(env, { error: "invalid_role" }, 400);
+        if (team && !validTeams.includes(team)) return json(env, { error: "invalid_team" }, 400);
+        if (role === "prof" && team) return json(env, { error: "prof_cannot_be_assigned_team" }, 400);
         const passwordHash = await passwordRecord(password);
         try {
-          await env.DB.prepare(
-            "INSERT INTO users(username,password_hash,role,team,active,created_at) VALUES(?,?,?,?,1,datetime('now'))"
-          ).bind(username, passwordHash, role, team || null).run();
+          await env.DB.prepare("INSERT INTO users(username,password_hash,role,team,active,created_at) VALUES(?,?,?,?,1,datetime('now'))").bind(username,passwordHash,role,team).run();
         } catch {
           return json(env, { error: "username_exists" }, 409);
         }
         return json(env, { ok: true });
       }
 
-      if (url.pathname.startsWith("/api/users/") && request.method === "DELETE") {
-        const id = url.pathname.split("/").pop();
-        await env.DB.prepare("UPDATE users SET active=0 WHERE id=?").bind(id).run();
+      if (url.pathname.startsWith("/api/users/") && (request.method === "PATCH" || request.method === "DELETE")) {
+        if (user.role !== "admin") return json(env, { error: "forbidden" }, 403);
+        const rawId = url.pathname.split("/").pop();
+        const id = Number(rawId);
+        if (!Number.isSafeInteger(id) || id <= 0) return json(env, { error: "invalid_user_id" }, 400);
+        const target = await env.DB.prepare("SELECT id,username,role,team,active FROM users WHERE id=?").bind(id).first();
+        if (!target) return json(env, { error: "not_found" }, 404);
+        const activeAdmins = await env.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE role='admin' AND active=1").first();
+        const isSelf = Number(user.id) === id;
+        if (request.method === "DELETE") {
+          if (isSelf) return json(env, { error: "cannot_deactivate_self" }, 400);
+          if (target.role === "admin" && target.active && activeAdmins.n <= 1) return json(env, { error: "last_active_admin" }, 409);
+          await env.DB.prepare("UPDATE users SET active=0 WHERE id=?").bind(id).run();
+          await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id).run();
+          await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
+          return json(env, { ok: true });
+        }
+
+        const body = await request.json();
+        const validTeams = ["conception","modelisation-3D","materiaux","fabrication","assemblage","essais","presentation"];
+        if (body.role !== undefined && !["eleve","prof","admin"].includes(body.role)) return json(env, { error: "invalid_role" }, 400);
+        if (body.team !== undefined && body.team && !validTeams.includes(body.team)) return json(env, { error: "invalid_team" }, 400);
+        if (body.active !== undefined && typeof body.active !== "boolean") return json(env, { error: "invalid_active_state" }, 400);
+        if (body.is_leader !== undefined && typeof body.is_leader !== "boolean") return json(env, { error: "invalid_leader_state" }, 400);
+        if (body.password !== undefined && body.password !== "" && (typeof body.password !== "string" || body.password.length < 8 || body.password.length > 256)) return json(env, { error: "password_too_short" }, 400);
+        if (isSelf && body.role !== undefined && body.role !== target.role) return json(env, { error: "cannot_change_own_role" }, 400);
+        if (isSelf && body.active === false) return json(env, { error: "cannot_deactivate_self" }, 400);
+        const nextRole = body.role === undefined ? target.role : body.role;
+        const nextTeam = body.team === undefined ? target.team : (body.team || null);
+        const nextActive = body.active === undefined ? Boolean(target.active) : body.active;
+        if (nextRole === "prof" && nextTeam) return json(env, { error: "prof_cannot_be_assigned_team" }, 400);
+        if (target.role === "admin" && target.active && (nextRole !== "admin" || !nextActive) && activeAdmins.n <= 1) return json(env, { error: "last_active_admin" }, 409);
+
+        if (body.team !== undefined || body.role !== undefined || body.active !== undefined) {
+          await env.DB.prepare("UPDATE users SET role=?,team=?,active=? WHERE id=?").bind(nextRole,nextTeam,nextActive?1:0,id).run();
+        }
+        if (body.is_leader !== undefined) {
+          if (body.is_leader) {
+            if (nextRole !== "eleve" || !nextTeam || !nextActive) return json(env, { error: "leader_needs_active_student_team" }, 400);
+            await env.DB.prepare("DELETE FROM team_leaders WHERE team=? OR user_id=?").bind(nextTeam,id).run();
+            await env.DB.prepare("INSERT INTO team_leaders(user_id,team,assigned_at) VALUES(?,?,datetime('now'))").bind(id,nextTeam).run();
+          } else {
+            await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
+          }
+        } else if (!nextTeam || nextRole !== "eleve" || !nextActive || (body.team !== undefined && nextTeam !== target.team)) {
+          await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
+        }
+        if (body.password) {
+          await env.DB.prepare("UPDATE users SET password_hash=? WHERE id=?").bind(await passwordRecord(body.password),id).run();
+          await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id).run();
+        }
+        if (!nextActive) {
+          await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id).run();
+          await env.DB.prepare("DELETE FROM team_leaders WHERE user_id=?").bind(id).run();
+        }
         return json(env, { ok: true });
       }
 
