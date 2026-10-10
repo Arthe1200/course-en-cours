@@ -106,6 +106,22 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { headers: cors(env) });
     const url = new URL(request.url);
 
+    // Toute opération non sûre doit provenir de l’origine du site et utiliser du JSON.
+    // Bootstrap reste protégé par son secret dédié et ne dépend pas d’un navigateur.
+    const isBootstrap = url.pathname === "/api/bootstrap" && request.method === "POST";
+    if (!["GET", "HEAD"].includes(request.method) && !isBootstrap) {
+      let expectedOrigin = "";
+      try { expectedOrigin = new URL(env.SITE_ORIGIN).origin; } catch {}
+      const origin = request.headers.get("Origin");
+      if (!expectedOrigin || origin !== expectedOrigin) {
+        return json(env, { error: "origin_forbidden" }, 403);
+      }
+      const contentType = request.headers.get("Content-Type") || "";
+      if (!/^application\/json(?:\s*;|$)/i.test(contentType)) {
+        return json(env, { error: "json_required" }, 415);
+      }
+    }
+
     try {
       if (url.pathname === "/api/bootstrap" && request.method === "POST") {
         const key = request.headers.get("X-Bootstrap-Key");
@@ -175,8 +191,12 @@ export default {
         const result = await env.DB.prepare("INSERT INTO annotations(user_id,content,team,created_at) VALUES(?,?,?,datetime('now'))").bind(user.id, content, user.team || null).run();
         const id = result.meta.last_row_id;
         for (const photo of photos) {
-          if (typeof photo.data_url !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(photo.data_url) || photo.data_url.length > 850000) continue;
-          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'annotation',?,?,?,?,datetime('now'))").bind(user.id,id,String(photo.filename||"photo.jpg").slice(0,120),String(photo.mime_type||"image/jpeg"),photo.data_url).run();
+          const dataUrl = typeof photo.data_url === "string" ? photo.data_url : "";
+          const imageMatch = dataUrl.match(/^data:image\/(jpeg|png|webp);base64,((?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?)$/);
+          if (!imageMatch || !imageMatch[2] || dataUrl.length > 850000) continue;
+          const mimeType = imageMatch[1] === "jpeg" ? "image/jpeg" : "image/" + imageMatch[1];
+          const filename = String(photo.filename || "photo.jpg").replace(/[^A-Za-z0-9._ -]/g, "_").slice(0, 120);
+          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'annotation',?,?,?,?,datetime('now'))").bind(user.id,id,filename,mimeType,dataUrl).run();
         }
         return json(env, { ok: true, id });
       }
