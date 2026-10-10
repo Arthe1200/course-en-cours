@@ -46,3 +46,7 @@ Puis pousser le changement sur main.
 - Le cookie de session est HttpOnly + Secure.
 - Les permissions sont contrôlées côté serveur.
 - Ne jamais mettre de mot de passe, clé Bootstrap ou token GitHub dans INTERFACE/.
+
+## Migration de l’inventaire
+
+Pour une base déjà créée, appliquer `AUTH/migrations/0002_materials.sql` avec Wrangler avant de déployer le Worker qui expose `/api/materials`. La table est aussi incluse dans `schema.sql` pour les nouvelles installations.
