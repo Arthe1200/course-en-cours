@@ -106,6 +106,21 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { headers: cors(env) });
     const url = new URL(request.url);
 
+    // Rejette les mutations provenant d'une autre origine ou envoyées sans JSON.
+    // Le bootstrap reste protégé par son secret séparé.
+    const isBootstrap = url.pathname === "/api/bootstrap" && request.method === "POST";
+    if (!["GET", "HEAD"].includes(request.method) && !isBootstrap) {
+      let expectedOrigin = "";
+      try { expectedOrigin = new URL(env.SITE_ORIGIN).origin; } catch {}
+      if (!expectedOrigin || request.headers.get("Origin") !== expectedOrigin) {
+        return json(env, { error: "origin_forbidden" }, 403);
+      }
+      const contentType = request.headers.get("Content-Type") || "";
+      if (!/^application\/json(?:\s*;|$)/i.test(contentType)) {
+        return json(env, { error: "json_required" }, 415);
+      }
+    }
+
     try {
       if (url.pathname === "/api/bootstrap" && request.method === "POST") {
         const key = request.headers.get("X-Bootstrap-Key");
@@ -175,8 +190,12 @@ export default {
         const result = await env.DB.prepare("INSERT INTO annotations(user_id,content,team,created_at) VALUES(?,?,?,datetime('now'))").bind(user.id, content, user.team || null).run();
         const id = result.meta.last_row_id;
         for (const photo of photos) {
-          if (typeof photo.data_url !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(photo.data_url) || photo.data_url.length > 850000) continue;
-          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'annotation',?,?,?,?,datetime('now'))").bind(user.id,id,String(photo.filename||"photo.jpg").slice(0,120),String(photo.mime_type||"image/jpeg"),photo.data_url).run();
+          const dataUrl = typeof photo.data_url === "string" ? photo.data_url : "";
+          const imageMatch = dataUrl.match(/^data:image\/(jpeg|png|webp);base64,((?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?)$/);
+          if (!imageMatch || !imageMatch[2] || dataUrl.length > 850000) continue;
+          const mimeType = imageMatch[1] === "jpeg" ? "image/jpeg" : "image/" + imageMatch[1];
+          const filename = String(photo.filename || "photo.jpg").replace(/[^A-Za-z0-9._ -]/g, "_").slice(0, 120);
+          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'annotation',?,?,?,?,datetime('now'))").bind(user.id,id,filename,mimeType,dataUrl).run();
         }
         return json(env, { ok: true, id });
       }
@@ -236,12 +255,75 @@ export default {
         const result=await env.DB.prepare("INSERT INTO private_notes(user_id,title,content,created_at,updated_at) VALUES(?,?,?,datetime('now'),datetime('now'))").bind(user.id,title,content).run();
         const id=result.meta.last_row_id;
         for(const photo of photos){
-          if(typeof photo.data_url!=="string"||!/^data:image\/(jpeg|png|webp);base64,/.test(photo.data_url)||photo.data_url.length>850000)continue;
-          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'private_note',?,?,?,?,datetime('now'))").bind(user.id,id,String(photo.filename||"photo.jpg").slice(0,120),String(photo.mime_type||"image/jpeg"),photo.data_url).run();
+          const dataUrl = typeof photo.data_url === "string" ? photo.data_url : "";
+          const imageMatch = dataUrl.match(/^data:image\/(jpeg|png|webp);base64,((?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?)$/);
+          if (!imageMatch || !imageMatch[2] || dataUrl.length > 850000) continue;
+          const mimeType = imageMatch[1] === "jpeg" ? "image/jpeg" : "image/" + imageMatch[1];
+          const filename = String(photo.filename || "photo.jpg").replace(/[^A-Za-z0-9._ -]/g, "_").slice(0, 120);
+          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'private_note',?,?,?,?,datetime('now'))").bind(user.id,id,filename,mimeType,dataUrl).run();
         }
         return json(env,{ok:true,id});
       }
 
+
+      // Inventaire partagé des matériaux et consommables.
+      if (url.pathname === "/api/materials" && request.method === "GET") {
+        const result = await env.DB.prepare(
+          "SELECT m.*, creator.username AS creator_username, updater.username AS updater_username FROM materials m JOIN users creator ON creator.id=m.created_by LEFT JOIN users updater ON updater.id=m.updated_by ORDER BY m.category,m.name"
+        ).all();
+        return json(env, { materials: result.results });
+      }
+
+      if (url.pathname === "/api/materials" && request.method === "POST") {
+        if (user.role === "prof") return json(env, { error: "read_only" }, 403);
+        const body = await request.json();
+        const name = String(body.name || "").trim();
+        const category = String(body.category || "Divers").trim();
+        const unit = String(body.unit || "unité").trim();
+        const location = String(body.location || "").trim();
+        const supplier = String(body.supplier || "").trim();
+        const notes = String(body.notes || "").trim();
+        const quantity = Number(body.quantity);
+        const cost = body.cost === "" || body.cost == null ? null : Number(body.cost);
+        const validTeams = ["conception","modelisation-3D","materiaux","fabrication","assemblage","essais","presentation"];
+        const team = user.role === "admin" ? String(body.team || user.team || "materiaux") : String(user.team || "");
+        if (!name || name.length > 120 || category.length > 60 || unit.length > 20 || location.length > 120 || supplier.length > 120 || notes.length > 1000) return json(env, { error: "invalid_material_fields" }, 400);
+        if (!Number.isFinite(quantity) || quantity < 0 || quantity > 100000000) return json(env, { error: "invalid_quantity" }, 400);
+        if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 100000000)) return json(env, { error: "invalid_cost" }, 400);
+        if (!validTeams.includes(team)) return json(env, { error: "invalid_team" }, 400);
+        const result = await env.DB.prepare("INSERT INTO materials(name,category,quantity,unit,team,location,supplier,cost,notes,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))")
+          .bind(name,category,quantity,unit,team,location,supplier,cost,notes,user.id,user.id).run();
+        return json(env, { ok: true, id: result.meta.last_row_id }, 201);
+      }
+
+      const materialMatch = url.pathname.match(/^\/api\/materials\/(\d+)$/);
+      if (materialMatch && ["PATCH", "DELETE"].includes(request.method)) {
+        if (user.role === "prof") return json(env, { error: "read_only" }, 403);
+        const materialId = Number(materialMatch[1]);
+        const old = await env.DB.prepare("SELECT * FROM materials WHERE id=?").bind(materialId).first();
+        if (!old) return json(env, { error: "not_found" }, 404);
+        if (user.role !== "admin" && old.team !== user.team) return json(env, { error: "material_team_forbidden" }, 403);
+        if (request.method === "DELETE") {
+          if (user.role !== "admin" && old.created_by !== user.id) return json(env, { error: "material_delete_forbidden" }, 403);
+          await env.DB.prepare("DELETE FROM materials WHERE id=?").bind(materialId).run();
+          return json(env, { ok: true });
+        }
+        const body = await request.json();
+        const name = String(body.name ?? old.name).trim();
+        const category = String(body.category ?? old.category).trim();
+        const unit = String(body.unit ?? old.unit).trim();
+        const location = String(body.location ?? old.location).trim();
+        const supplier = String(body.supplier ?? old.supplier).trim();
+        const notes = String(body.notes ?? old.notes).trim();
+        const quantity = Number(body.quantity ?? old.quantity);
+        const cost = body.cost === "" ? null : body.cost == null ? old.cost : Number(body.cost);
+        if (!name || name.length > 120 || category.length > 60 || unit.length > 20 || location.length > 120 || supplier.length > 120 || notes.length > 1000) return json(env, { error: "invalid_material_fields" }, 400);
+        if (!Number.isFinite(quantity) || quantity < 0 || quantity > 100000000) return json(env, { error: "invalid_quantity" }, 400);
+        if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 100000000)) return json(env, { error: "invalid_cost" }, 400);
+        await env.DB.prepare("UPDATE materials SET name=?,category=?,quantity=?,unit=?,team=?,location=?,supplier=?,cost=?,notes=?,updated_by=?,updated_at=datetime('now') WHERE id=?")
+          .bind(name,category,quantity,unit,old.team,location,supplier,cost,notes,user.id,materialId).run();
+        return json(env, { ok: true });
+      }
 
       // Tableau de tâches partagé : toutes les routes sont authentifiées et les professeurs restent en lecture seule.
       if (url.pathname === "/api/tasks" && request.method === "GET") {
@@ -421,8 +503,12 @@ export default {
         const result = await env.DB.prepare("INSERT INTO project_items(type,title,content,created_by,team,session_date,status,created_at,updated_at) VALUES(?,?,?,?,?,?, 'ouvert',datetime('now'),datetime('now'))").bind(type,title,content,user.id,team,type==="journal"?sessionDate:null).run();
         const id = result.meta.last_row_id;
         for (const photo of photos) {
-          if (typeof photo.data_url !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(photo.data_url) || photo.data_url.length > 850000) continue;
-          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'item',?,?,?,?,datetime('now'))").bind(user.id,id,String(photo.filename||"photo.jpg").slice(0,120),String(photo.mime_type||"image/jpeg"),photo.data_url).run();
+          const dataUrl = typeof photo.data_url === "string" ? photo.data_url : "";
+          const imageMatch = dataUrl.match(/^data:image\/(jpeg|png|webp);base64,((?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?)$/);
+          if (!imageMatch || !imageMatch[2] || dataUrl.length > 850000) continue;
+          const mimeType = imageMatch[1] === "jpeg" ? "image/jpeg" : "image/" + imageMatch[1];
+          const filename = String(photo.filename || "photo.jpg").replace(/[^A-Za-z0-9._ -]/g, "_").slice(0, 120);
+          await env.DB.prepare("INSERT INTO attachments(owner_id,parent_type,parent_id,filename,mime_type,data_url,created_at) VALUES(?,'item',?,?,?,?,datetime('now'))").bind(user.id,id,filename,mimeType,dataUrl).run();
         }
         return json(env, { ok: true, id });
       }
