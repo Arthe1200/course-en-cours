@@ -241,3 +241,42 @@ img, canvas, video, iframe { max-width: 100%; }
 .user-admin-card select:disabled{opacity:.7}
 .user-inactive .account-status{letter-spacing:.01em}
 @media(max-width:700px){.permission-overview{grid-template-columns:1fr}.user-admin-card .admin-controls{grid-template-columns:1fr}.user-admin-card .password-reset{grid-column:auto}}
+
+/* Carnet de bord, inventaire et impression */
+.journal-tools{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.journal-tools h3{margin:0 0 6px}.journal-tools p{margin:0}
+.journal-form-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.journal-form-row:first-child{grid-template-columns:2fr 1fr 1fr}
+.journal-filters{display:grid;grid-template-columns:minmax(180px,2fr) minmax(160px,1fr) minmax(120px,.8fr) auto;gap:10px;align-items:end;margin:12px 0}
+.journal-filters label,.material-filter-row label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:750}
+.journal-filters input,.journal-filters select,.material-filter-row input,.material-filter-row select{width:100%;min-width:0;border:1px solid var(--border,#d7dce2);border-radius:10px;padding:10px;background:var(--panel,#fff);color:inherit;font:inherit}
+.journal-card{display:grid;grid-template-columns:58px minmax(0,1fr) auto;align-items:center;gap:12px;text-align:left}
+.journal-date{width:54px;min-height:58px;border-radius:12px;background:#eef4fa;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#244a80}
+.journal-date b{font-size:21px;line-height:1.1}.journal-date small{font-size:10px;text-transform:capitalize}
+.journal-card-main{display:flex;flex-direction:column;gap:5px;min-width:0}.journal-card .item-preview{white-space:normal;line-height:1.45}
+.journal-empty{padding:28px;text-align:center;border:1px dashed var(--border,#d0d5dd);border-radius:12px;color:var(--muted,#667085)}
+.material-form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.material-filter-row{display:grid;grid-template-columns:minmax(200px,2fr) minmax(170px,1fr);gap:12px;margin-bottom:16px}
+.material-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0 18px}
+.material-summary>div{display:flex;flex-direction:column;gap:4px;border:1px solid var(--border,#e4e7ec);border-radius:12px;padding:14px;background:var(--panel,#fff)}
+.material-summary b{font-size:21px}.material-summary span{font-size:12px;color:var(--muted,#667085)}
+.material-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.material-card{min-width:0;border:1px solid var(--border,#e4e7ec);border-radius:14px;padding:15px;background:var(--panel,#fff)}
+.material-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.material-card h4{margin:6px 0 10px;font-size:16px;overflow-wrap:anywhere}
+.material-category{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#667085);font-weight:800}
+.material-quantity{white-space:nowrap;border-radius:9px;background:#edf4fb;color:#244a80;padding:7px 9px;font-size:13px}
+.material-meta{display:grid;grid-template-columns:1fr 1fr;gap:7px;font-size:12px;color:var(--muted,#667085);overflow-wrap:anywhere}
+.material-notes{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.material-edit{margin-top:12px;border-top:1px solid var(--border,#e4e7ec);padding-top:10px}.material-edit summary{cursor:pointer;font-weight:750}
+.material-edit .danger{background:#b42318;color:#fff}.material-edit-msg{font-size:12px}
+@media(max-width:760px){.journal-form-row,.journal-form-row:first-child,.journal-filters,.material-form-grid,.material-filter-row,.material-summary,.material-list{grid-template-columns:1fr}.journal-card{grid-template-columns:48px minmax(0,1fr)}.journal-date{width:44px;min-height:52px}.journal-card .item-open{grid-column:2}.material-card-head{flex-wrap:wrap}.material-meta{grid-template-columns:1fr}}
+@media print{
+  body{background:#fff!important;color:#111!important;font-size:10pt!important}
+  #loginView,#teamPicker,header,nav,#identity,#profileBtn,#logoutBtn,.button,button,.journal-compose,#materialCreateForm,.material-edit,.task-edit,.task-footer,.task-history,.ai-chat-form,.form-message,.journal-filters,.material-filter-row{display:none!important}
+  #appView,main,#page,.panel,.material-card,.task-card{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:8px!important;border:0!important;box-shadow:none!important;background:#fff!important;color:#111!important;break-inside:avoid}
+  .hero{margin:0 0 10px!important;padding:0!important;background:#fff!important;color:#111!important}
+  .item-card{display:block!important;width:100%!important;text-align:left!important;border:1px solid #ccc!important;break-inside:avoid}
+  .material-list{display:block!important}.material-card{border-bottom:1px solid #bbb!important;margin-bottom:8px!important}
+  a{color:#111!important;text-decoration:none!important}
+  .muted,.item-meta,.material-meta{color:#444!important}
+  @page{size:auto;margin:14mm}
+}
