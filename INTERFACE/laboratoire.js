@@ -58,7 +58,7 @@ function destroyViewer(){
   if(renderer){renderer.dispose();renderer.domElement.remove();}
   renderer=null;scene=null;camera=null;controls=null;activeObject=null;wireframeOn=false;
   $("viewer").innerHTML='<div class="viewer-empty"><span>🧊</span><b>Ton aperçu apparaîtra ici</b><p>Les modèles 3D peuvent être tournés, déplacés et agrandis.</p></div>';
-  $("viewerTools").hidden=true;$("modelStats").hidden=true;$("textPreview").hidden=true;$("unsupported").hidden=true;
+  $("viewerTools").hidden=true;$("modelStats").hidden=true;$("dimensionCheck").hidden=true;$("textPreview").hidden=true;$("unsupported").hidden=true;
 }
 function renderList(){
   const el=$("fileList");
@@ -175,9 +175,11 @@ async function loadModel(file,ext){
  let triangles=0,meshes=0;
  object.traverse(child=>{if(child.isMesh){meshes++;const g=child.geometry;if(g){triangles+=g.index?g.index.count/3:(g.attributes.position?.count||0)/3;}}});
  $("modelStats").hidden=false;$("modelStats").innerHTML=[
-  ["Largeur",size.x],["Hauteur",size.y],["Profondeur",size.z]
- ].map(([label,value])=>'<div class="stat-chip"><small>'+label+' · unités du fichier</small><b>'+Number(value).toFixed(2)+'</b></div>').join("")+
+  ["Axe X",size.x],["Axe Y",size.y],["Axe Z",size.z]
+ ].map(([label,value])=>'<div class="stat-chip"><small>'+label+' · unités du fichier</small><b>'+Number(value).toFixed(3)+'</b></div>').join("")+
  '<div class="stat-chip"><small>Maillages</small><b>'+meshes+'</b></div><div class="stat-chip"><small>Triangles estimés</small><b>'+Math.round(triangles).toLocaleString("fr-FR")+'</b></div><div class="stat-chip"><small>Fichier</small><b>'+fmtSize(file.size)+'</b></div>';
+ $("dimensionCheck").hidden=false;
+ updateDimensionCheck(size);
  const animate=()=>{if(!renderer||!scene||!camera)return;animationFrameId=requestAnimationFrame(animate);controls?.update();renderer.render(scene,camera);};
  animate();
  resizeObserver=new ResizeObserver(()=>{
@@ -189,6 +191,34 @@ async function loadModel(file,ext){
  });
  resizeObserver.observe(host);
 }
+function updateDimensionCheck(sizeOverride=null){
+ if(!activeObject)return;
+ const size=sizeOverride||new THREE.Box3().setFromObject(activeObject).getSize(new THREE.Vector3());
+ const mmPerUnit=Math.max(0,Number($("mmPerUnit").value)||0);
+ const longAxis=$("lengthAxis").value, verticalAxis=$("heightAxis").value;
+ const axisNames={x:"X",y:"Y",z:"Z"};
+ const dims={x:size.x*mmPerUnit,y:size.y*mmPerUnit,z:size.z*mmPerUnit};
+ const widthAxis=["x","y","z"].find(a=>a!==longAxis&&a!==verticalAxis);
+ const valid=mmPerUnit>0&&longAxis!==verticalAxis&&!!widthAxis;
+ const result=$("dimensionResults");
+ if(!valid){result.innerHTML='<p class="dimension-warning">Choisis deux axes différents et une échelle positive.</p>';return;}
+ const measurements=[
+  {label:"Longueur",value:dims[longAxis],limit:Number($("maxLength").value),axis:axisNames[longAxis]},
+  {label:"Largeur",value:dims[widthAxis],limit:Number($("maxWidth").value),axis:axisNames[widthAxis]},
+  {label:"Hauteur",value:dims[verticalAxis],limit:Number($("maxHeight").value),axis:axisNames[verticalAxis]}
+ ];
+ result.innerHTML=measurements.map(m=>{
+  const hasLimit=Number.isFinite(m.limit)&&m.limit>0;
+  const pass=hasLimit&&m.value<=m.limit;
+  const close=pass&&(m.limit-m.value)<=2;
+  const state=!hasLimit?"Limite à renseigner":!pass?"DÉPASSEMENT":close?"Conforme, marge ≤ 2 mm":"Conforme";
+  const cls=!hasLimit?"dimension-unknown":!pass?"dimension-fail":close?"dimension-close":"dimension-pass";
+  return '<div class="dimension-result '+cls+'"><span>'+m.label+' <small>(axe '+m.axis+')</small></span><b>'+m.value.toFixed(2)+' mm</b><small>Limite : '+(hasLimit?m.limit.toFixed(2)+' mm':"non définie")+'</small><strong>'+state+'</strong></div>';
+ }).join("");
+ $("dimensionSummary").textContent=measurements.every(m=>Number.isFinite(m.limit)&&m.limit>0)
+  ?(measurements.every(m=>m.value<=m.limit)?"Le modèle respecte les trois limites saisies.":"Au moins une dimension dépasse la limite saisie.")
+  :"Renseigne les limites du cahier des charges avant de conclure.";
+}
 function fitObject(){
  if(!activeObject||!camera||!controls)return;
  const box=new THREE.Box3().setFromObject(activeObject),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
@@ -197,6 +227,7 @@ function fitObject(){
  camera.position.set(distance*.9,distance*.75,distance*1.1);camera.near=Math.max(max/10000,.001);camera.far=max*100;camera.updateProjectionMatrix();
  controls.target.set(0,0,0);controls.update();
 }
+["mmPerUnit","lengthAxis","heightAxis","maxLength","maxWidth","maxHeight"].forEach(id=>$(id).addEventListener("input",()=>updateDimensionCheck()));
 $("fileInput").addEventListener("change",e=>{addFiles(e.target.files);e.target.value="";});
 const drop=$("dropZone");
 drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("dragging");});
