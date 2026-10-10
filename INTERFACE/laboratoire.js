@@ -81,7 +81,7 @@ function selectFile(id){
   $("formatPill").textContent=ext.toUpperCase()||"FICHIER";
   $("askAi").disabled=false;$("aiAnswer").hidden=true;
   status("Fichier sélectionné. Décris ce que tu veux comprendre.");
-  if(modelExtensions.has(ext)){loadModel(file,ext).catch(e=>showUnsupported("Impossible d’ouvrir ce modèle : "+e.message));return;}
+  if(modelExtensions.has(ext)){loadModel(file,ext).catch(e=>{destroyViewer();showUnsupported("Impossible d’ouvrir ce modèle : "+e.message);});return;}
   if(textExtensions.has(ext)){showText(file);return;}
   if(imageExtensions.has(ext)){showImage(file);return;}
   if(ext==="pdf"){showPdf(file);return;}
@@ -156,8 +156,18 @@ async function loadModel(file,ext){
  }else if(ext==="3mf"){
    object=new ThreeMFLoader().parse(await file.arrayBuffer());
  }else{
-   const loader=new GLTFLoader();
-   const gltf=await new Promise((resolve,reject)=>loader.load(url,resolve,undefined,reject));
+   const manager=new THREE.LoadingManager();
+   manager.setURLModifier(resourceUrl=>{
+     const clean=decodeURIComponent(resourceUrl.split(/[?#]/)[0].split("/").pop()||"");
+     const dependency=files.find(entry=>entry.file.name===clean);
+     if(!dependency)return resourceUrl;
+     const dependencyUrl=URL.createObjectURL(dependency.file);
+     objectUrls.add(dependencyUrl);
+     return dependencyUrl;
+   });
+   const loader=new GLTFLoader(manager);
+   const buffer=await file.arrayBuffer();
+   const gltf=await new Promise((resolve,reject)=>loader.parse(buffer,"",resolve,reject));
    object=gltf.scene;
  }
  activeObject=object;scene.add(object);fitObject();$("viewerTools").hidden=false;
