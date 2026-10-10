@@ -91,6 +91,7 @@ Ce dépôt est privé et réservé à l'équipe du projet et aux personnes autor
 - Export imprimable en PDF depuis le navigateur pour le carnet, les tâches, les tests et l’inventaire.
 - Inventaire partagé des matériaux : catégorie, quantité, unité, équipe, emplacement, fournisseur, coût et notes.
 - Signalement visuel des tâches en retard.
+- Limitation des tentatives de connexion (10 échecs par IP sur 15 minutes) et quotas IA quotidiens (20 questions par compte, 5 générations de journal administrateur).
 - Photos validées côté Worker et revalidées côté interface avant affichage.
 - Les mutations API vérifient l’origine attendue et exigent un type de contenu JSON.
 
@@ -100,6 +101,7 @@ Sur une base D1 déjà initialisée, exécuter une seule fois depuis la racine d
 
 ```powershell
 npx wrangler d1 execute course-en-cours --remote --file=AUTH/migrations/0002_materials.sql
+npx wrangler d1 execute course-en-cours --remote --file=AUTH/migrations/0003_rate_limits_ai_quota.sql
 ```
 
 La commande modifie la base distante. Vérifie que Wrangler est connecté au bon compte Cloudflare et que le nom de base correspond à `AUTH/wrangler.toml` avant de l’exécuter. Pour une base neuve, `AUTH/schema.sql` contient également la table.
