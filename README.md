@@ -84,3 +84,22 @@ Chaque membre peut contribuer au carnet de bord. Après chaque séance, utilisez
 Ce dépôt est privé et réservé à l'équipe du projet et aux personnes autorisées, notamment les enseignants.
 
 > Les informations de progression doivent refléter le travail réellement réalisé. Les modèles et fichiers techniques seront ajoutés au fur et à mesure du projet.
+
+## Fonctionnalités récentes
+
+- Carnet de bord structuré par séance, avec recherche et filtres par équipe/année.
+- Export imprimable en PDF depuis le navigateur pour le carnet, les tâches, les tests et l’inventaire.
+- Inventaire partagé des matériaux : catégorie, quantité, unité, équipe, emplacement, fournisseur, coût et notes.
+- Signalement visuel des tâches en retard.
+- Photos validées côté Worker et revalidées côté interface avant affichage.
+- Les mutations API vérifient l’origine attendue et exigent un type de contenu JSON.
+
+## Migration D1 pour l’inventaire
+
+Sur une base D1 déjà initialisée, exécuter une seule fois depuis la racine du dépôt :
+
+```powershell
+npx wrangler d1 execute course-en-cours --remote --file=AUTH/migrations/0002_materials.sql
+```
+
+La commande modifie la base distante. Vérifie que Wrangler est connecté au bon compte Cloudflare et que le nom de base correspond à `AUTH/wrangler.toml` avant de l’exécuter. Pour une base neuve, `AUTH/schema.sql` contient également la table.
