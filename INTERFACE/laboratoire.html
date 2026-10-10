@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101820">
+<title>Laboratoire technique — Course en Cours</title>
+<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="laboratoire.css?v=2">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
+</script>
+</head>
+<body class="lab-body">
+<header class="topbar lab-topbar">
+  <a class="lab-back" href="index.html">← Retour à l’espace projet</a>
+  <div class="brand"><div class="logo">🧰</div><div><span>COURSE EN COURS</span><h1>Laboratoire technique</h1></div></div>
+  <span id="labIdentity" class="identity">Vérification du compte…</span>
+</header>
+<main class="lab-main">
+  <section class="lab-intro">
+    <div><span class="eyebrow">OUTILS DES ÉLÈVES</span><h2>Un seul espace pour vos fichiers techniques.</h2><p>Visualise un modèle 3D, lis un programme Arduino, consulte un plan ou prépare une question à l’assistant IA.</p></div>
+    <div class="lab-badge">🔒 Traitement local par défaut</div>
+  </section>
+  <section class="lab-upload panel">
+    <div class="section-heading"><div><h3>1. Ajouter des fichiers</h3><p class="muted">Sélectionne un ou plusieurs fichiers. Ils restent dans ton navigateur : aucun envoi automatique.</p></div><button id="clearAll" class="button secondary" type="button">Vider l’espace</button></div>
+    <label id="dropZone" class="drop-zone"><input id="fileInput" type="file" multiple accept=".stl,.obj,.glb,.gltf,.3mf,.step,.stp,.iges,.igs,.sldprt,.sldasm,.slddrw,.slddrt,.ino,.cpp,.c,.h,.hpp,.py,.js,.ts,.json,.yaml,.yml,.xml,.csv,.txt,.md,.pdf,.png,.jpg,.jpeg,.webp,.gif,.svg,.dxf,.ai,.hex,.elf,.zip,.ino">
+      <span class="drop-icon">📂</span><strong>Dépose tes fichiers ici</strong><span>ou touche pour parcourir les fichiers de ton appareil</span><small>Formats 3D, code, plans, images et documents</small></label>
+    <div id="fileList" class="file-list"><p class="notice">Aucun fichier ajouté. Commence par choisir un modèle, un programme ou un document.</p></div>
+  </section>
+  <section class="lab-workspace">
+    <div class="panel viewer-panel">
+      <div class="section-heading"><div><h3>2. Visionneuse et aperçu</h3><p id="selectedMeta" class="muted">Choisis un fichier dans la liste.</p></div><span id="formatPill" class="format-pill">EN ATTENTE</span></div>
+      <div id="viewer" class="viewer"><div class="viewer-empty"><span>🧊</span><b>Ton aperçu apparaîtra ici</b><p>Les modèles 3D peuvent être tournés, déplacés et agrandis.</p></div></div>
+      <div id="viewerTools" class="viewer-tools" hidden><button id="fitModel" class="button secondary" type="button">Cadrer le modèle</button><button id="saveView" class="button secondary" type="button">Exporter une image</button><button id="wireframe" class="button secondary" type="button">Mode filaire</button><button id="resetView" class="button secondary" type="button">Réinitialiser</button></div>
+      <div id="modelStats" class="model-stats" hidden></div>
+      <section id="dimensionCheck" class="dimension-check" hidden aria-labelledby="dimensionTitle">
+        <div class="dimension-heading"><h4 id="dimensionTitle">Mesures et conformité dimensionnelle</h4><span>Calcul depuis la boîte englobante 3D</span></div>
+        <p class="dimension-note">Les fichiers STL n’indiquent généralement pas leur unité. Vérifie l’échelle et l’orientation des axes avant de te fier au résultat. Les limites ci-dessous sont modifiables : confirme-les dans le cahier des charges officiel 2026–2027 de votre compétition.</p>
+        <div class="dimension-controls">
+          <label>Échelle <span>mm par unité du fichier</span><input id="mmPerUnit" type="number" min="0.000001" step="any" value="1"></label>
+          <label>Axe de la longueur<select id="lengthAxis"><option value="x" selected>X</option><option value="y">Y</option><option value="z">Z</option></select></label>
+          <label>Axe de la hauteur<select id="heightAxis"><option value="y" selected>Y</option><option value="x">X</option><option value="z">Z</option></select></label>
+        </div>
+        <div class="dimension-controls dimension-limits">
+          <label>Longueur max. (mm)<input id="maxLength" type="number" min="1" step="1" value="350"></label>
+          <label>Largeur max. (mm)<input id="maxWidth" type="number" min="1" step="1" value="120"></label>
+          <label>Hauteur max. (mm)<input id="maxHeight" type="number" min="1" step="1" value="180"></label>
+        </div>
+        <p id="dimensionSummary" class="dimension-summary">Renseigne les limites du cahier des charges avant de conclure.</p>
+        <div id="dimensionResults" class="dimension-results" aria-live="polite"></div>
+      </section>
+      <div id="textPreview" class="text-preview" hidden></div>
+      <div id="unsupported" class="notice" hidden></div>
+    </div>
+    <aside class="panel assistant-panel">
+      <span class="eyebrow">AIDE À LA CONCEPTION</span><h3>3. Comprendre et progresser</h3>
+      <p class="muted">Pose une question sur le fichier sélectionné. L’assistant reçoit le nom, le format et les informations techniques disponibles ; le code texte peut être ajouté à la question.</p>
+      <label class="field-label" for="question">Que veux-tu savoir ?</label>
+      <textarea id="question" maxlength="1400" placeholder="Ex. Explique ce code, vérifie les dimensions affichées ou aide-moi à préparer les essais…"></textarea>
+      <label class="checkline"><input id="includeCode" type="checkbox" checked> Joindre un extrait si le fichier est du code ou du texte</label>
+      <button id="askAi" class="button primary" type="button" disabled>Demander à l’assistant IA</button>
+      <p id="aiStatus" class="muted small">Sélectionne un fichier pour commencer.</p>
+      <div id="aiAnswer" class="ai-answer" hidden></div>
+      <div class="student-tip"><b>💡 Astuce élève</b><p>Demande à l’IA d’expliquer avant de corriger. Vérifie toujours les cotes, le code et les résultats avec ton équipe ou ton professeur.</p></div>
+    </aside>
+  </section>
+  <section class="panel formats-panel"><h3>Formats pris en charge</h3><div class="format-grid">
+    <div><b>🧊 3D affichable</b><p>STL, OBJ, GLB, GLTF et 3MF. Rotation, zoom, mesures et export d’une capture PNG. Pour un GLTF avec fichiers externes, importe aussi les fichiers BIN/textures associés.</p></div>
+    <div><b>💻 Code</b><p>INO, C/C++, Python, JavaScript, JSON, HEX et fichiers texte : aperçu lisible et contexte pour l’IA.</p></div>
+    <div><b>🖼️ Plans et documents</b><p>Images, SVG et PDF : aperçu dans le navigateur.</p></div>
+    <div><b>🛠️ CAO native</b><p>STEP/STP, IGES/IGS et SOLIDWORKS SLDPRT/SLDASM/SLDDRW/SLDDRT sont reconnus, mais doivent être exportés en STL/STEP/GLB ou PDF pour un aperçu direct.</p></div>
+  </div><p class="notice">Les fichiers restent locaux jusqu’à ce que tu demandes explicitement une analyse IA. L’assistant ne peut pas reconstruire toutes les fonctions paramétriques SOLIDWORKS depuis le navigateur. Pour une pièce native, exporte une copie depuis SOLIDWORKS ou FreeCAD.</p></section>
+</main>
+<script src="config.js?v=2"></script>
+<script type="module" src="laboratoire.js?v=2"></script>
+</body>
+</html>
