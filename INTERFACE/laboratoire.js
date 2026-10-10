@@ -19,7 +19,7 @@ const api = async (path, options={}) => {
 };
 let files = [];
 let selectedId = null;
-let renderer = null, scene = null, camera = null, controls = null, activeObject = null;
+let renderer = null, scene = null, camera = null, controls = null, activeObject = null, resizeObserver = null, animationFrameId = 0;
 let wireframeOn = false;
 const objectUrls = new Set();
 const textExtensions = new Set(["ino","cpp","c","h","hpp","py","js","ts","json","yaml","yml","xml","csv","txt","md","hex"]);
@@ -35,8 +35,26 @@ function requireSession(){
   api("/me").then(data=>{const user=data.user; $("labIdentity").textContent=(user.username||"Compte connecté")+" · "+(user.role==="prof"?"Professeur":user.role==="admin"?"Administrateur":"Élève"); if(user.role==="prof"){ $("askAi").disabled=true; status("Le compte professeur est en consultation seule. Connecte-toi avec un compte élève pour interroger l’IA."); } else { $("askAi").disabled=!selectedId; } }).catch(()=>{location.href="index.html";});
 }
 function revokeUrls(){ for(const url of objectUrls) URL.revokeObjectURL(url); objectUrls.clear(); }
+function disposeObject(object){
+  if(!object)return;
+  object.traverse(child=>{
+    if(child.geometry)child.geometry.dispose();
+    if(child.material){
+      const materials=Array.isArray(child.material)?child.material:[child.material];
+      materials.forEach(material=>{
+        if(!material)return;
+        for(const value of Object.values(material)){if(value && value.isTexture)value.dispose();}
+        material.dispose();
+      });
+    }
+  });
+}
 function destroyViewer(){
+  if(animationFrameId)cancelAnimationFrame(animationFrameId);
+  animationFrameId=0;
+  if(resizeObserver){resizeObserver.disconnect();resizeObserver=null;}
   if(controls?.dispose) controls.dispose();
+  disposeObject(activeObject);
   if(renderer){renderer.dispose();renderer.domElement.remove();}
   renderer=null;scene=null;camera=null;controls=null;activeObject=null;wireframeOn=false;
   $("viewer").innerHTML='<div class="viewer-empty"><span>🧊</span><b>Ton aperçu apparaîtra ici</b><p>Les modèles 3D peuvent être tournés, déplacés et agrandis.</p></div>';
@@ -98,14 +116,30 @@ async function showText(file){
 function showImage(file){const url=URL.createObjectURL(file);objectUrls.add(url);$("viewer").innerHTML='<img alt="'+escapeHtml(file.name)+'" src="'+url+'">';}
 function showPdf(file){const url=URL.createObjectURL(file);objectUrls.add(url);$("viewer").innerHTML='<iframe title="Aperçu PDF" src="'+url+'"></iframe>';}
 function setupRenderer(){
- const host=$("viewer");renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.setSize(host.clientWidth,host.clientHeight);renderer.setClearColor(0x101820);renderer.outputColorSpace=THREE.SRGBColorSpace;host.innerHTML="";host.appendChild(renderer.domElement);
- scene=new THREE.Scene();scene.background=new THREE.Color(0x101820);
- camera=new THREE.PerspectiveCamera(45,host.clientWidth/host.clientHeight,0.01,100000);camera.position.set(3,3,5);
+ const host=$("viewer");
+ const width=Math.max(host.clientWidth,1),height=Math.max(host.clientHeight,1);
+ renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,preserveDrawingBuffer:true});
+ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+ renderer.setSize(width,height);
+ renderer.setClearColor(0x101820);
+ renderer.outputColorSpace=THREE.SRGBColorSpace;
+ host.innerHTML="";
+ host.appendChild(renderer.domElement);
+ scene=new THREE.Scene();
+ scene.background=new THREE.Color(0x101820);
+ camera=new THREE.PerspectiveCamera(45,width/height,0.001,1000000);
+ camera.position.set(3,3,5);
  scene.add(new THREE.HemisphereLight(0xffffff,0x64748b,2.2));
- const key=new THREE.DirectionalLight(0xffffff,2.3);key.position.set(5,8,6);scene.add(key);
- const grid=new THREE.GridHelper(10,20,0x64748b,0x334155);grid.position.y=-0.001;scene.add(grid);
- const axes=new THREE.AxesHelper(1);scene.add(axes);
- const OrbitControlsModule=awaitOrbitControls;
+ const key=new THREE.DirectionalLight(0xffffff,2.3);
+ key.position.set(5,8,6);
+ scene.add(key);
+ const grid=new THREE.GridHelper(10,20,0x64748b,0x334155);
+ grid.name="lab-grid";
+ grid.position.y=-0.001;
+ scene.add(grid);
+ const axes=new THREE.AxesHelper(1);
+ axes.name="lab-axes";
+ scene.add(axes);
 }
 async function loadModel(file,ext){
  const OrbitControls= (await import("three/addons/controls/OrbitControls.js")).OrbitControls;
@@ -134,9 +168,16 @@ async function loadModel(file,ext){
   ["Largeur",size.x],["Hauteur",size.y],["Profondeur",size.z]
  ].map(([label,value])=>'<div class="stat-chip"><small>'+label+' · unités du fichier</small><b>'+Number(value).toFixed(2)+'</b></div>').join("")+
  '<div class="stat-chip"><small>Maillages</small><b>'+meshes+'</b></div><div class="stat-chip"><small>Triangles estimés</small><b>'+Math.round(triangles).toLocaleString("fr-FR")+'</b></div><div class="stat-chip"><small>Fichier</small><b>'+fmtSize(file.size)+'</b></div>';
- const animate=()=>{if(!renderer||!scene||!camera)return;requestAnimationFrame(animate);controls?.update();renderer.render(scene,camera);};animate();
- const onResize=()=>{if(!renderer||!camera)return;const w=host.clientWidth,h=host.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);};
- new ResizeObserver(onResize).observe(host);
+ const animate=()=>{if(!renderer||!scene||!camera)return;animationFrameId=requestAnimationFrame(animate);controls?.update();renderer.render(scene,camera);};
+ animate();
+ resizeObserver=new ResizeObserver(()=>{
+   if(!renderer||!camera)return;
+   const w=Math.max(host.clientWidth,1),h=Math.max(host.clientHeight,1);
+   camera.aspect=w/h;
+   camera.updateProjectionMatrix();
+   renderer.setSize(w,h);
+ });
+ resizeObserver.observe(host);
 }
 function fitObject(){
  if(!activeObject||!camera||!controls)return;
@@ -157,6 +198,18 @@ $("fileList").addEventListener("click",e=>{
 });
 $("clearAll").addEventListener("click",()=>{files=[];selectedId=null;revokeUrls();destroyViewer();renderList();$("selectedMeta").textContent="Choisis un fichier dans la liste.";$("formatPill").textContent="EN ATTENTE";$("askAi").disabled=true;$("aiAnswer").hidden=true;status("Sélectionne un fichier pour commencer.");});
 $("fitModel").addEventListener("click",fitObject);
+$("saveView").addEventListener("click",()=>{
+ if(!renderer||!activeObject){status("Charge un modèle 3D avant d’exporter une image.");return;}
+ renderer.render(scene,camera);
+ renderer.domElement.toBlob(blob=>{
+   if(!blob){status("Le navigateur n’a pas pu créer l’image.");return;}
+   const url=URL.createObjectURL(blob),link=document.createElement("a");
+   link.href=url;link.download="course-en-cours-modele-3d.png";
+   document.body.appendChild(link);link.click();link.remove();
+   setTimeout(()=>URL.revokeObjectURL(url),1000);
+   status("Capture PNG enregistrée sur ton appareil.",true);
+ },"image/png");
+});
 $("resetView").addEventListener("click",()=>{fitObject();if(controls){controls.reset();fitObject();}});
 $("wireframe").addEventListener("click",()=>{if(!activeObject)return;wireframeOn=!wireframeOn;activeObject.traverse(child=>{if(child.isMesh){const mats=Array.isArray(child.material)?child.material:[child.material];mats.forEach(m=>{if(m)m.wireframe=wireframeOn;});}});$("wireframe").textContent=wireframeOn?"Désactiver le filaire":"Mode filaire";});
 $("askAi").addEventListener("click",async()=>{
