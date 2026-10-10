@@ -34,6 +34,22 @@
       <div id="viewer" class="viewer"><div class="viewer-empty"><span>🧊</span><b>Ton aperçu apparaîtra ici</b><p>Les modèles 3D peuvent être tournés, déplacés et agrandis.</p></div></div>
       <div id="viewerTools" class="viewer-tools" hidden><button id="fitModel" class="button secondary" type="button">Cadrer le modèle</button><button id="saveView" class="button secondary" type="button">Exporter une image</button><button id="wireframe" class="button secondary" type="button">Mode filaire</button><button id="resetView" class="button secondary" type="button">Réinitialiser</button></div>
       <div id="modelStats" class="model-stats" hidden></div>
+      <section id="dimensionCheck" class="dimension-check" hidden aria-labelledby="dimensionTitle">
+        <div class="dimension-heading"><h4 id="dimensionTitle">Mesures et conformité dimensionnelle</h4><span>Calcul depuis la boîte englobante 3D</span></div>
+        <p class="dimension-note">Les fichiers STL n’indiquent généralement pas leur unité. Vérifie l’échelle et l’orientation des axes avant de te fier au résultat. Les limites ci-dessous sont modifiables : confirme-les dans le cahier des charges officiel 2026–2027 de votre compétition.</p>
+        <div class="dimension-controls">
+          <label>Échelle <span>mm par unité du fichier</span><input id="mmPerUnit" type="number" min="0.000001" step="any" value="1"></label>
+          <label>Axe de la longueur<select id="lengthAxis"><option value="x" selected>X</option><option value="y">Y</option><option value="z">Z</option></select></label>
+          <label>Axe de la hauteur<select id="heightAxis"><option value="y" selected>Y</option><option value="x">X</option><option value="z">Z</option></select></label>
+        </div>
+        <div class="dimension-controls dimension-limits">
+          <label>Longueur max. (mm)<input id="maxLength" type="number" min="1" step="1" value="350"></label>
+          <label>Largeur max. (mm)<input id="maxWidth" type="number" min="1" step="1" value="120"></label>
+          <label>Hauteur max. (mm)<input id="maxHeight" type="number" min="1" step="1" value="180"></label>
+        </div>
+        <p id="dimensionSummary" class="dimension-summary">Renseigne les limites du cahier des charges avant de conclure.</p>
+        <div id="dimensionResults" class="dimension-results" aria-live="polite"></div>
+      </section>
       <div id="textPreview" class="text-preview" hidden></div>
       <div id="unsupported" class="notice" hidden></div>
     </div>
